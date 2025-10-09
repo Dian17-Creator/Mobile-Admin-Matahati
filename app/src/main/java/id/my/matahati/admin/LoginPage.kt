@@ -51,7 +51,7 @@ class LoginPage : ComponentActivity() {
             val userName = user["name"]?.toString() ?: ""
             val userEmail = user["email"]?.toString() ?: ""
 
-            val intent = Intent(this, QrPage::class.java).apply {
+            val intent = Intent(this, MainActivity::class.java).apply {
                 putExtra("USER_ID", userId)
                 putExtra("USER_NAME", userName)
                 putExtra("USER_EMAIL", userEmail)
@@ -109,6 +109,7 @@ fun loginUser(
                             put("id", json.optInt("admin_id", -1))
                             put("name", json.optString("admin_name", ""))
                             put("email", json.optString("email", ""))
+                            put("password", json.optString("password", ""))
                         }
                         context.runOnUiThread {
                             onResult(true, message, user)
@@ -162,7 +163,7 @@ fun LoginUI() {
             verticalArrangement = Arrangement.Center
         ) {
             Image(
-                painter = painterResource(id = R.drawable.loginbro),
+                painter = painterResource(id = R.drawable.tablet_login),
                 contentDescription = "Login",
                 modifier = Modifier
                     .size(260.dp)
@@ -266,17 +267,22 @@ fun handleLogin(context: ComponentActivity, email: String, password: String, rem
 
             val session = SessionManager(context.applicationContext)
 
-            // Bersihkan session lama
-            session.clearSession()
+            // Simpan sementara ke cache & prefs agar tidak hilang di antara Activity
+            SessionManager.SessionCache.tempPassword = password
+            session.saveTempPassword(password)
 
             if (rememberMe) {
-                session.saveUser(id = userId, name = userName, email = userEmail)
+                session.saveUser(userId, userName, userEmail, password)
                 session.setRememberMe(true)
+                session.clearTempPassword()
             } else {
+                // ✅ Simpan data minimal agar AbsenManual bisa jalan
+                session.saveTempUser(userEmail, password)
                 session.setRememberMe(false)
             }
 
-            val intent = Intent(context, QrPage::class.java).apply {
+            // ✅ Pindah ke halaman QR
+            val intent = Intent(context, MainActivity::class.java).apply {
                 putExtra("USER_ID", userId)
                 putExtra("USER_NAME", userName)
                 putExtra("USER_EMAIL", userEmail)
@@ -286,6 +292,8 @@ fun handleLogin(context: ComponentActivity, email: String, password: String, rem
         }
     }
 }
+
+
 
 @Composable
 fun keyboardAsState(): State<Boolean> {

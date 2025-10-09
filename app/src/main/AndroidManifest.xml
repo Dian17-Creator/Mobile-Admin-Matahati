@@ -42,5 +42,10 @@
             android:name=".QrPage"
             android:exported="true" />
 
+        <activity
+            android:name=".AbsenManual"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize" />
+
     </application>
 </manifest>

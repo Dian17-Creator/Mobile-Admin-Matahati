@@ -5,7 +5,6 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -53,6 +52,9 @@ class QrPage : ComponentActivity() {
             )
         }
 
+        val session = SessionManager(applicationContext)
+        SessionManager.SessionCache.tempPassword = session.getTempPassword()
+
         setContent {
             QrUi()
         }
@@ -62,17 +64,16 @@ class QrPage : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QrUi() {
+
     val context = LocalContext.current
     val session = SessionManager(context.applicationContext)
     val scope = rememberCoroutineScope()
-
     var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var expiryTime by remember { mutableStateOf<Date?>(null) }
     var lat by remember { mutableStateOf<Double?>(null) }
     var lng by remember { mutableStateOf<Double?>(null) }
     var loading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-
     var remainingTime by remember { mutableStateOf("") }
 
     // 🔁 Auto refresh QR tiap 60 detik
@@ -195,7 +196,12 @@ fun QrUi() {
 
                 Button(
                     onClick = {
-                        session.clearSession()
+                        // 🔹 Logout berbeda tergantung mode login
+                        if (session.isRememberMe()) {
+                            session.clearSession()
+                        } else {
+                            session.clearLoginButKeepTemp()
+                        }
                         val intent = Intent(context, LoginPage::class.java)
                         context.startActivity(intent)
                         if (context is ComponentActivity) context.finish()
@@ -210,6 +216,7 @@ fun QrUi() {
                 ) {
                     Text("LOGOUT")
                 }
+
             }
         }
     }
@@ -233,9 +240,9 @@ suspend fun getDeviceLocation(context: android.content.Context): Pair<Double, Do
     }
 }
 
-/**
- * 🔁 Fetch token dari server dan buat QR
- */
+
+ //🔁 Fetch token dari server dan buat QR
+
 suspend fun fetchAndGenerateQR(
     context: android.content.Context,
     onResult: (Bitmap?, Date?, Double?, Double?, String?) -> Unit
@@ -315,9 +322,7 @@ suspend fun fetchAndGenerateQR(
 }
 
 
-/**
- * 🧩 Buat QR bitmap
- */
+//🧩 Buat QR bitmap
 fun generateQrBitmap(text: String, size: Int = 512): Bitmap {
     val bitMatrix: BitMatrix = MultiFormatWriter().encode(
         text,
