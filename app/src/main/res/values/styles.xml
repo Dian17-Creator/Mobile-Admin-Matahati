@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="CustomBottomNavigationView" parent="Widget.MaterialComponents.BottomNavigationView">
+
+
+        <!-- Opsional: ubah teks aktif & nonaktif -->
+        <item name="itemTextAppearanceActive">@style/BottomNavTextSmall</item>
+        <item name="itemTextAppearanceInactive">@style/BottomNavTextSmall</item>
+    </style>
+
+    <style name="BottomNavTextSmall">
+        <item name="android:textSize">10sp</item>
+    </style>
+
+</resources>

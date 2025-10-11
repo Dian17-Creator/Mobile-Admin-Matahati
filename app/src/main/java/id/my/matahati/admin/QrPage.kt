@@ -9,6 +9,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,6 +37,10 @@ import org.json.JSONObject
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.foundation.background
 
 class QrPage : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,13 +68,18 @@ class QrPage : ComponentActivity() {
     }
 }
 
+@Preview(
+    showBackground = true,
+    showSystemUi = true,
+    name = "Halaman QR Preview"
+)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QrUi() {
-
     val context = LocalContext.current
     val session = SessionManager(context.applicationContext)
     val scope = rememberCoroutineScope()
+
     var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var expiryTime by remember { mutableStateOf<Date?>(null) }
     var lat by remember { mutableStateOf<Double?>(null) }
@@ -102,32 +114,27 @@ fun QrUi() {
         }
     }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = Color(0xFFFDF9FF)
-    ) {
-        Column(
+    // 🌈 Tampilan utama dua bagian (atas QR, bawah info)
+    Column(modifier = Modifier.fillMaxSize()) {
+        // ===== Bagian Atas =====
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+                .fillMaxWidth()
+                .weight(0.55f)
+                .background(
+                    color = Color(0xFFFF6F51)
+                ),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "Halaman QR",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
             when {
                 loading -> {
-                    CircularProgressIndicator(color = Color(0xFFFF6F51))
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Memuat QR Code...")
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = Color(0xFFFF6F51))
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Memuat QR Code...")
+                    }
                 }
+
                 errorMessage != null -> {
                     Text(
                         text = errorMessage ?: "",
@@ -135,33 +142,54 @@ fun QrUi() {
                         fontSize = 14.sp
                     )
                 }
+
                 qrBitmap != null -> {
-                    Image(
-                        bitmap = qrBitmap!!.asImageBitmap(),
-                        contentDescription = "QR Code",
+                    // QR Code dengan sedikit bayangan biar menonjol
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.cardElevation(8.dp),
                         modifier = Modifier
-                            .size(220.dp)
-                            .padding(8.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    expiryTime?.let {
-                        val dateText = SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.getDefault()).format(it)
-                        Text("QR valid until: $dateText", fontSize = 14.sp)
+                            .padding(24.dp)
+                            .size(300.dp)
+                    ) {
+                        Image(
+                            bitmap = qrBitmap!!.asImageBitmap(),
+                            contentDescription = "QR Code",
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Time remaining: $remainingTime", fontSize = 14.sp)
-
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "GPS Coordinates: ${lat ?: 0.0}, ${lng ?: 0.0}",
-                        fontSize = 14.sp
-                    )
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(28.dp))
+        // ===== Bagian Bawah =====
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(0.45f)
+                .padding(horizontal = 24.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            expiryTime?.let {
+                val dateText =
+                    SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.getDefault()).format(it)
+                Text(
+                    "QR valid until : $dateText",
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("Time remaining : $remainingTime", fontSize = 14.sp)
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "GPS Coordinates : ${lat ?: 0.0}, ${lng ?: 0.0}",
+                fontSize = 14.sp
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -187,16 +215,24 @@ fun QrUi() {
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .height(50.dp)
+                        .height(50.dp),
+                    shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("REFRESH TOKEN")
+                    Text(
+                        text = "REFRESH TOKEN",
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
 
                 Button(
                     onClick = {
-                        // 🔹 Logout berbeda tergantung mode login
                         if (session.isRememberMe()) {
                             session.clearSession()
                         } else {
@@ -207,20 +243,29 @@ fun QrUi() {
                         if (context is ComponentActivity) context.finish()
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFF6F51),
+                        containerColor = Color(0xFFFF0000),
                         contentColor = Color.White
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .height(50.dp)
+                        .height(50.dp),
+                    shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("LOGOUT")
+                    Text(
+                        text = "LOGOUT",
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
                 }
-
             }
         }
     }
 }
+
 
 /**
  * 📍 Ambil lokasi real-time
