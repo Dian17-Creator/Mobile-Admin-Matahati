@@ -213,7 +213,7 @@ fun AbsenManualScreen() {
                 painter = painterResource(id = R.drawable.panaform),
                 contentDescription = "Ilustrasi Absen",
                 modifier = Modifier
-                    .height((120.dp * scaleFactor).coerceAtLeast(80.dp))
+                    .height((160.dp * scaleFactor).coerceAtLeast(80.dp))
                     .padding(bottom = (8.dp * scaleFactor)),
                 contentScale = ContentScale.Fit
             )
