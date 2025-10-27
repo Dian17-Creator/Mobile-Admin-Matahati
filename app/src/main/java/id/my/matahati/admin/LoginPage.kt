@@ -1,20 +1,48 @@
 package id.my.matahati.admin
 
-import okhttp3.*
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
@@ -23,20 +51,19 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.input.*
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.FormBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.json.JSONObject
 import java.io.IOException
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.ui.text.input.ImeAction
-import androidx.lifecycle.lifecycleScope
 
 
 // ✅ OkHttpClient Singleton (agar tidak membuat instance berulang)
@@ -107,7 +134,11 @@ suspend fun loginUser(
                 put("id", json.optInt("admin_id", -1))
                 put("name", json.optString("admin_name", ""))
                 put("email", json.optString("email", ""))
-                put("password", json.optString("password", ""))
+                put("password", password)
+                put("department", json.optString("mdepartment", ""))
+                put("fadmin", json.optInt("fadmin", 0))
+                put("fsuper", json.optInt("fsuper", 0))
+                put("fhrd", json.optInt("fhrd", 0))
             }
             Triple(true, msg, user)
         } else {
@@ -340,14 +371,29 @@ fun handleLogin(
             val session = SessionManager(context.applicationContext)
             session.saveTempPassword(password)
 
+            val userDepartment = userJson.optString("department", "")
+            val fadmin = userJson.optInt("fadmin", 0)
+            val fsuper = userJson.optInt("fsuper", 0)
+            val fhrd = userJson.optInt("fhrd", 0)
+
             if (rememberMe) {
-                session.saveUser(userId, userName, userEmail, password)
+                session.saveUser(
+                    userId,
+                    userName,
+                    userEmail,
+                    password,
+                    userDepartment,
+                    fadmin,
+                    fsuper,
+                    fhrd
+                )
                 session.setRememberMe(true)
                 session.clearTempPassword()
             } else {
                 session.saveTempUser(userEmail, password)
                 session.setRememberMe(false)
             }
+
 
             val intent = Intent(context, MainActivity::class.java).apply {
                 putExtra("USER_ID", userId)
