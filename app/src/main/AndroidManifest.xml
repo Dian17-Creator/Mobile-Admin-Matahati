@@ -46,5 +46,10 @@
             android:exported="true"
             android:windowSoftInputMode="adjustResize" />
 
+        <activity
+            android:name=".IzinAdmin"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize" />
+
     </application>
 </manifest>
