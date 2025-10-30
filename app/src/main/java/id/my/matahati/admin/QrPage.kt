@@ -308,7 +308,6 @@ fun QrUi() {
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-
             // 🔘 Tombol Absen Manual & Izin Manual
             Row(
                 modifier = Modifier.fillMaxWidth(),
