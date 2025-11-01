@@ -15,11 +15,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -40,9 +40,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
@@ -94,6 +96,11 @@ class QrPage : ComponentActivity() {
     }
 }
 
+@Preview(
+    showBackground = true,
+    showSystemUi = true,
+    name = "QR Page Preview"
+)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QrUi() {
@@ -141,8 +148,8 @@ fun QrUi() {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.55f)
-                .background(Color(0xFFFF6F51)),
+                .weight(0.6f) // 🔹 Tingkatkan weight untuk bagian atas
+                .background(Color(0xFFB63352)),
             contentAlignment = Alignment.Center
         ) {
             Column(
@@ -153,7 +160,7 @@ fun QrUi() {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp), // 🔹 Kurangi padding
                     elevation = CardDefaults.cardElevation(8.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF4C4C59)),
                     shape = RoundedCornerShape(12.dp)
@@ -165,7 +172,7 @@ fun QrUi() {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp),
+                        .padding(horizontal = 16.dp, vertical = 4.dp), // 🔹 Kurangi padding
                     elevation = CardDefaults.cardElevation(8.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF4C4C59)),
                     shape = RoundedCornerShape(12.dp)
@@ -173,14 +180,17 @@ fun QrUi() {
                     CardLokasi(lat = lat, lng = lng)
                 }
 
-                //Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // 🔹 QR Code
+                // 🔹 QR Code - BAGIAN YANG DIPERBESAR
                 when {
                     loading -> {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(vertical = 32.dp)
+                        ) {
                             CircularProgressIndicator(color = Color.White)
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text("Memuat QR Code...", color = Color.White)
                         }
                     }
@@ -189,28 +199,36 @@ fun QrUi() {
                         Text(
                             text = errorMessage ?: "",
                             color = Color.Red,
-                            fontSize = 14.sp
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(16.dp)
                         )
                     }
 
                     qrBitmap != null -> {
+                        // 🔹 QR CODE YANG DIPERBESAR
                         Card(
-                            shape = RoundedCornerShape(16.dp),
-                            elevation = CardDefaults.cardElevation(20.dp),
-                            colors = CardDefaults.cardColors(   // 🔹 Tambahkan baris ini
-                                containerColor = Color.White    // 🔹 Ubah warna background menjadi putih
+                            shape = RoundedCornerShape(20.dp),
+                            elevation = CardDefaults.cardElevation(25.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color.White
                             ),
                             modifier = Modifier
-                                .padding(26.dp)
-                                .size(400.dp)
+                                .fillMaxWidth(0.8f) // 🔹 Gunakan 90% lebar layar
+                                .aspectRatio(1f) // 🔹 Pastikan tetap persegi
+                                .padding(16.dp) // 🔹 Kurangi padding agar QR lebih besar
                         ) {
-                            Image(
-                                bitmap = qrBitmap!!.asImageBitmap(),
-                                contentDescription = "QR Code",
-                                modifier = Modifier.fillMaxSize()
-                            )
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    bitmap = qrBitmap!!.asImageBitmap(),
+                                    contentDescription = "QR Code",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.FillBounds // 🔹 Isi penuh area
+                                )
+                            }
                         }
-
                     }
                 }
             }
@@ -220,23 +238,33 @@ fun QrUi() {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.45f)
-                .padding(horizontal = 24.dp, vertical = 20.dp),
+                .weight(0.4f) // 🔹 Sesuaikan weight
+                .padding(horizontal = 16.dp, vertical = 16.dp), // 🔹 Kurangi padding
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Informasi QR
             expiryTime?.let {
                 val dateText =
                     SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.getDefault()).format(it)
-                Text("QR valid until : $dateText", fontSize = 14.sp, textAlign = TextAlign.Center)
+                Text(
+                    "QR valid until: $dateText",
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
-            Text("Time remaining : $remainingTime", fontSize = 14.sp)
+            Text(
+                "Time remaining: $remainingTime",
+                fontSize = 14.sp,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
 
-            Spacer(modifier = Modifier.height(4.dp))
-            Text("GPS Coordinates : ${lat ?: 0.0}, ${lng ?: 0.0}", fontSize = 14.sp)
-
-            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                "GPS Coordinates: ${lat ?: 0.0}, ${lng ?: 0.0}",
+                fontSize = 14.sp,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
 
             // 🔘 Tombol Refresh dan Logout
             Row(
@@ -263,7 +291,7 @@ fun QrUi() {
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .height(50.dp),
+                        .height(48.dp),
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(
@@ -275,7 +303,7 @@ fun QrUi() {
                     )
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
                 Button(
                     onClick = {
@@ -294,7 +322,7 @@ fun QrUi() {
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .height(50.dp),
+                        .height(48.dp),
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(
@@ -307,7 +335,8 @@ fun QrUi() {
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
             // 🔘 Tombol Absen Manual & Izin Manual
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -324,7 +353,7 @@ fun QrUi() {
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .height(50.dp),
+                        .height(48.dp),
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(
@@ -336,7 +365,7 @@ fun QrUi() {
                     )
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
                 Button(
                     onClick = {
@@ -349,7 +378,7 @@ fun QrUi() {
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .height(50.dp),
+                        .height(48.dp),
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(
@@ -383,13 +412,13 @@ fun CardWaktu() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(20.dp),
+            .padding(16.dp), // 🔹 Kurangi padding
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = waktuSekarang.value,
             color = Color.White,
-            fontSize = 16.sp,
+            fontSize = 14.sp, // 🔹 Sesuaikan font size
             textAlign = TextAlign.Center
         )
     }
@@ -420,21 +449,23 @@ fun CardLokasi(lat: Double?, lng: Double?) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(12.dp), // 🔹 Kurangi padding
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = "📍 Lokasi Sekarang",
             color = Color.White,
-            fontSize = 14.sp,
+            fontSize = 12.sp, // 🔹 Sesuaikan font size
             textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = alamat,
             color = Color.White,
-            fontSize = 12.sp,
-            textAlign = TextAlign.Center
+            fontSize = 10.sp, // 🔹 Sesuaikan font size
+            textAlign = TextAlign.Center,
+            maxLines = 2, // 🔹 Batasi jumlah baris
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -523,7 +554,8 @@ suspend fun fetchAndGenerateQR(
     }
 }
 
-fun generateQrBitmap(text: String, size: Int = 512): Bitmap {
+// 🔹 FUNGSI GENERATE QR YANG DIPERBAIKI
+fun generateQrBitmap(text: String, size: Int = 1000): Bitmap {
     val bitMatrix: BitMatrix = MultiFormatWriter().encode(
         text,
         BarcodeFormat.QR_CODE,

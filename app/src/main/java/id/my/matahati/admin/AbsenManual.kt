@@ -138,7 +138,7 @@ fun AbsenManualScreen() {
     var reason by rememberSaveable { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
 
-    val primaryColor = Color(0xFFFF6F51)
+    val primaryColor = Color(0xFFB63352)
     val focusManager = LocalFocusManager.current
     var lat by remember { mutableStateOf(LocationCache.lat) }
     var lng by remember { mutableStateOf(LocationCache.lng) }
@@ -226,7 +226,7 @@ fun AbsenManualScreen() {
                 .height((400.dp * scaleFactor).coerceAtLeast(250.dp))
                 .align(Alignment.BottomCenter)
                 .background(
-                    color = Color(0xFFFD6E50),
+                    color = Color(0xFFB63352),
                     shape = RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp)
                 )
         )
@@ -444,6 +444,13 @@ suspend fun handleAbsenManual(
     withContext(Dispatchers.Main) {
         isLoadingSetter(false)
         Toast.makeText(context, result, Toast.LENGTH_LONG).show()
+
+        // ✅ Jika absen berhasil, kembali ke MainActivity
+        if (result.contains("berhasil", ignoreCase = true)) {
+            val intent = android.content.Intent(context, MainActivity::class.java)
+            context.startActivity(intent)
+            if (context is ComponentActivity) context.finish()
+        }
     }
 }
 
