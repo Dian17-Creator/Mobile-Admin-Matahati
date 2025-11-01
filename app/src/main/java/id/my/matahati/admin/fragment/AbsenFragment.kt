@@ -16,7 +16,6 @@ class AbsenManualFragment : Fragment() {
     ): View {
         return ComposeView(requireContext()).apply {
             setContent {
-                // Panggil fungsi composable dari AbsenManual.kt
                 AbsenManualScreen()
             }
         }

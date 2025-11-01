@@ -161,7 +161,7 @@ suspend fun loginUser(
 fun LoginUI() {
     val context = LocalContext.current as ComponentActivity
     val focusManager = LocalFocusManager.current
-    val primaryColor = Color(0xFFFF6F51)
+    val primaryColor = Color(0xFFB63352)
 
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }

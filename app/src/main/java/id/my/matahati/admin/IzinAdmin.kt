@@ -48,6 +48,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
@@ -89,6 +90,11 @@ class IzinAdmin : ComponentActivity() {
     }
 }
 
+@Preview(
+    showBackground = true,
+    showSystemUi = true,
+    name = "Izin Preview"
+)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IzinAdminUi() {
@@ -96,7 +102,7 @@ fun IzinAdminUi() {
     val session = SessionManager(context.applicationContext)
     val scope = rememberCoroutineScope()
 
-    val primaryColor = Color(0xFFFF6F51)
+    val primaryColor = Color(0xFFB63352)
     var selectedUserName by remember { mutableStateOf("") }
     var selectedUserId by remember { mutableStateOf<Int?>(null) }
     var alasan by remember { mutableStateOf("") }
@@ -110,7 +116,7 @@ fun IzinAdminUi() {
         LocationServices.getFusedLocationProviderClient(context)
     }
 
-    // 📍 Ambil lokasi + konversi ke alamat readable via Nominatim
+    // 📍 Ambil lokasi otomatis
     LaunchedEffect(Unit) {
         try {
             if (ActivityCompat.checkSelfPermission(
@@ -121,7 +127,6 @@ fun IzinAdminUi() {
                 if (loc != null) {
                     lat = loc.latitude
                     lng = loc.longitude
-
                     withContext(Dispatchers.IO) {
                         try {
                             val client = OkHttpClient()
@@ -142,9 +147,7 @@ fun IzinAdminUi() {
                                     placeName = if (displayName.isNotBlank()) displayName else "$lat, $lng"
                                 }
                             } else {
-                                withContext(Dispatchers.Main) {
-                                    placeName = "$lat, $lng"
-                                }
+                                withContext(Dispatchers.Main) { placeName = "$lat, $lng" }
                             }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) { placeName = "$lat, $lng" }
@@ -169,8 +172,8 @@ fun IzinAdminUi() {
 
                 val response = client.newCall(request).execute()
                 val body = response.body?.string() ?: ""
-
                 val jsonObject = JSONObject(body)
+
                 if (jsonObject.optBoolean("success", false)) {
                     val dataArray = jsonObject.getJSONArray("data")
                     val tempList = mutableListOf<Pair<Int, String>>()
@@ -200,7 +203,6 @@ fun IzinAdminUi() {
             .fillMaxSize()
             .background(Color.White)
     ) {
-        // Warna oranye di bawah
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -209,12 +211,11 @@ fun IzinAdminUi() {
                 .background(primaryColor)
         )
 
-        // Konten utama
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .imePadding() // 🧩 seluruh konten naik saat keyboard muncul
+                .imePadding()
                 .padding(horizontal = 24.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -299,18 +300,6 @@ fun IzinAdminUi() {
                         }
                     }
 
-                    // Lokasi otomatis
-//                    OutlinedTextField(
-//                        value = "📍 $placeName",
-//                        onValueChange = {},
-//                        label = { Text("Lokasi Saat Ini", fontSize = 13.sp) },
-//                        enabled = false,
-//                        modifier = Modifier
-//                            .fillMaxWidth()
-//                            .padding(vertical = 8.dp),
-//                        maxLines = 2
-//                    )
-
                     // Alasan izin
                     OutlinedTextField(
                         value = alasan,
@@ -331,6 +320,7 @@ fun IzinAdminUi() {
 
                     Spacer(modifier = Modifier.height(15.dp))
 
+                    // ✅ Tombol SIMPAN IZIN dengan redirect ke AdminMainActivity
                     Button(
                         onClick = {
                             if (selectedUserId == null || alasan.isEmpty()) {
@@ -347,11 +337,16 @@ fun IzinAdminUi() {
                                         placeName = placeName
                                     )
                                     loading = false
-                                    Toast.makeText(
-                                        context,
-                                        if (success) "Izin berhasil disimpan ✅" else "Gagal menyimpan izin ❌",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+
+                                    if (success) {
+                                        Toast.makeText(context, "Izin berhasil disimpan ✅", Toast.LENGTH_SHORT).show()
+                                        // 🔹 Kembali ke halaman utama admin
+                                        val intent = android.content.Intent(context, MainActivity::class.java)
+                                        context.startActivity(intent)
+                                        if (context is ComponentActivity) context.finish()
+                                    } else {
+                                        Toast.makeText(context, "Gagal menyimpan izin ❌", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }
                         },
@@ -379,7 +374,6 @@ fun IzinAdminUi() {
         }
     }
 }
-
 /**
  * 🔹 Kirim data izin ke server
  */
