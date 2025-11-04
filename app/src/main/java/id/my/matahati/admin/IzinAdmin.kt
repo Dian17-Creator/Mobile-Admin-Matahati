@@ -1,11 +1,17 @@
 package id.my.matahati.admin
 
 import android.Manifest
+import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.os.Bundle
+import android.util.Base64
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -14,11 +20,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -27,8 +36,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -43,17 +51,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import coil.compose.rememberAsyncImagePainter
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -64,45 +74,50 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.time.LocalDate
 
 class IzinAdmin : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // ✅ Fix utama agar imePadding berfungsi di Compose
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        // ✅ Minta izin lokasi
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
+        // Minta izin kamera & lokasi
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+            != PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED
         ) {
             ActivityCompat.requestPermissions(
                 this,
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                arrayOf(
+                    Manifest.permission.CAMERA,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ),
                 200
             )
         }
 
-        setContent { IzinAdminUi() }
+        setContent { IzinAdminScreen() }
     }
 }
 
-@Preview(
-    showBackground = true,
-    showSystemUi = true,
-    name = "Izin Preview"
-)
+// Fungsi untuk skala adaptif
+@Composable
+fun rememberAdaptiveScale(baseWidthDp: Float = 411f): Float {
+    val configuration = LocalConfiguration.current
+    val screenWidthDp = configuration.screenWidthDp.toFloat()
+    return (screenWidthDp / baseWidthDp).coerceIn(0.8f, 1.2f)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun IzinAdminUi() {
+fun IzinAdminScreen() {
     val context = LocalContext.current
     val session = SessionManager(context.applicationContext)
     val scope = rememberCoroutineScope()
-
     val primaryColor = Color(0xFFB63352)
+
     var selectedUserName by remember { mutableStateOf("") }
     var selectedUserId by remember { mutableStateOf<Int?>(null) }
     var alasan by remember { mutableStateOf("") }
@@ -111,12 +126,16 @@ fun IzinAdminUi() {
     var lng by remember { mutableStateOf(0.0) }
     var placeName by remember { mutableStateOf("Mencari lokasi...") }
     var loading by remember { mutableStateOf(false) }
+    var photoBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var photoBase64 by remember { mutableStateOf("") }
 
     val fusedLocationClient = remember {
         LocationServices.getFusedLocationProviderClient(context)
     }
 
-    // 📍 Ambil lokasi otomatis
+    val scaleFactor = rememberAdaptiveScale()
+
+    // Ambil lokasi otomatis
     LaunchedEffect(Unit) {
         try {
             if (ActivityCompat.checkSelfPermission(
@@ -127,86 +146,79 @@ fun IzinAdminUi() {
                 if (loc != null) {
                     lat = loc.latitude
                     lng = loc.longitude
+
+                    // Ubah jadi alamat readable
                     withContext(Dispatchers.IO) {
-                        try {
-                            val client = OkHttpClient()
-                            val url =
-                                "https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1"
-
-                            val request = Request.Builder()
-                                .url(url)
-                                .addHeader("User-Agent", "MatahatiApp/1.0 (mailto:admin@matahati.my.id)")
-                                .build()
-
-                            val response = client.newCall(request).execute()
-                            val json = response.body?.string()
-                            if (response.isSuccessful && json != null) {
-                                val obj = JSONObject(json)
-                                val displayName = obj.optString("display_name", "")
-                                withContext(Dispatchers.Main) {
-                                    placeName = if (displayName.isNotBlank()) displayName else "$lat, $lng"
-                                }
-                            } else {
-                                withContext(Dispatchers.Main) { placeName = "$lat, $lng" }
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) { placeName = "$lat, $lng" }
+                        val client = OkHttpClient()
+                        val url =
+                            "https://nominatim.openstreetmap.org/reverse?lat=$lat&lon=$lng&format=json&addressdetails=1"
+                        val req = Request.Builder()
+                            .url(url)
+                            .addHeader("User-Agent", "MatahatiApp/1.0")
+                            .build()
+                        val res = client.newCall(req).execute()
+                        val body = res.body?.string()
+                        if (res.isSuccessful && body != null) {
+                            val obj = JSONObject(body)
+                            val displayName = obj.optString("display_name", "$lat, $lng")
+                            withContext(Dispatchers.Main) { placeName = displayName }
+                        } else {
+                            placeName = "$lat, $lng"
                         }
                     }
                 } else placeName = "Lokasi tidak tersedia"
-            } else placeName = "Izin lokasi belum diberikan"
+            }
         } catch (e: Exception) {
             placeName = "Lokasi tidak diketahui"
         }
     }
 
-    // 🔹 Ambil daftar user dari server
+    // Ambil daftar user
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             try {
                 val adminId = session.getUserId()
                 val client = OkHttpClient()
                 val request = Request.Builder()
-                    .url("https://absensi.matahati.my.id/get_users_by_department.php?admin_id=$adminId&nocache=${System.currentTimeMillis()}")
+                    .url("https://absensi.matahati.my.id/get_users_by_department.php?admin_id=$adminId")
                     .build()
-
                 val response = client.newCall(request).execute()
                 val body = response.body?.string() ?: ""
-                val jsonObject = JSONObject(body)
-
-                if (jsonObject.optBoolean("success", false)) {
-                    val dataArray = jsonObject.getJSONArray("data")
-                    val tempList = mutableListOf<Pair<Int, String>>()
-                    for (i in 0 until dataArray.length()) {
-                        val obj = dataArray.getJSONObject(i)
-                        val id = obj.optInt("nid", 0)
-                        val name = obj.optString("cname", "")
-                        if (id != 0 && name.isNotEmpty()) tempList.add(id to name)
+                val json = JSONObject(body)
+                if (json.optBoolean("success", false)) {
+                    val arr = json.getJSONArray("data")
+                    val temp = mutableListOf<Pair<Int, String>>()
+                    for (i in 0 until arr.length()) {
+                        val o = arr.getJSONObject(i)
+                        temp.add(o.optInt("nid") to o.optString("cname"))
                     }
-                    withContext(Dispatchers.Main) { users = tempList }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "Gagal memuat data karyawan", Toast.LENGTH_SHORT).show()
-                    }
+                    withContext(Dispatchers.Main) { users = temp }
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Terjadi kesalahan: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-            }
+            } catch (_: Exception) {}
         }
     }
 
-    // ==================== UI ====================
+    // Kamera launcher
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+        bitmap?.let {
+            photoBitmap = it
+            val out = ByteArrayOutputStream()
+            it.compress(Bitmap.CompressFormat.JPEG, 80, out)
+            photoBase64 = Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
+        }
+    }
+
+    // ================= UI =====================
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .verticalScroll(rememberScrollState())
     ) {
+        // Background bawah (warna maroon)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(350.dp)
+                .height((400.dp * scaleFactor).coerceAtLeast(250.dp))
                 .align(Alignment.BottomCenter)
                 .background(primaryColor)
         )
@@ -214,57 +226,61 @@ fun IzinAdminUi() {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .imePadding()
-                .padding(horizontal = 24.dp, vertical = 24.dp),
+                .padding(horizontal = (24.dp * scaleFactor))
+                .padding(top = (40.dp * scaleFactor), bottom = (24.dp * scaleFactor)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Gambar header
             Image(
                 painter = painterResource(id = R.drawable.panaform),
-                contentDescription = "Ilustrasi Izin Admin",
+                contentDescription = null,
                 modifier = Modifier
-                    .height(130.dp)
-                    .padding(bottom = 8.dp),
+                    .height((130.dp * scaleFactor).coerceAtLeast(80.dp))
+                    .padding(bottom = (8.dp * scaleFactor)),
                 contentScale = ContentScale.Fit
             )
 
+            // Judul
             Text(
-                text = "Form Izin",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black,
-                    fontSize = 22.sp
-                ),
+                text = "Form Izin (Admin)",
+                fontWeight = FontWeight.Bold,
+                fontSize = (22.sp * scaleFactor),
+                color = Color.Black,
                 textAlign = TextAlign.Center
             )
 
+            // Deskripsi singkat
             Text(
-                text = "Form ini digunakan untuk membuat izin bagi karyawan dalam departemen Anda.",
+                text = "Gunakan form ini untuk membuat izin manual bagi karyawan.",
                 textAlign = TextAlign.Center,
                 color = Color.Gray,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                fontSize = (14.sp * scaleFactor),
+                modifier = Modifier.padding(
+                    horizontal = (20.dp * scaleFactor),
+                    vertical = (8.dp * scaleFactor)
+                )
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height((20.dp * scaleFactor)))
 
+            // CARD FORM
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                shape = RoundedCornerShape(20.dp),
+                    .padding(bottom = (16.dp * scaleFactor)),
+                shape = RoundedCornerShape((20.dp * scaleFactor)),
                 elevation = CardDefaults.cardElevation(8.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFDF9FC))
             ) {
                 Column(
                     modifier = Modifier
-                        .padding(20.dp)
+                        .padding((20.dp * scaleFactor))
                         .fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // Dropdown user
                     var expanded by remember { mutableStateOf(false) }
 
-                    // Dropdown karyawan
                     ExposedDropdownMenuBox(
                         expanded = expanded,
                         onExpandedChange = { expanded = !expanded }
@@ -273,19 +289,19 @@ fun IzinAdminUi() {
                             value = selectedUserName,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Pilih Karyawan", fontSize = 13.sp) },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                            label = { Text("Pilih Karyawan", fontSize = (13.sp * scaleFactor)) },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                            },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = primaryColor,
                                 focusedLabelColor = primaryColor,
                                 cursorColor = primaryColor
-                            ),
-                            modifier = Modifier
-                                .menuAnchor()
-                                .fillMaxWidth()
-                                .padding(bottom = 8.dp)
+                            )
                         )
-
                         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                             users.forEach { (id, name) ->
                                 DropdownMenuItem(
@@ -300,17 +316,14 @@ fun IzinAdminUi() {
                         }
                     }
 
-                    // Alasan izin
                     OutlinedTextField(
                         value = alasan,
                         onValueChange = { alasan = it },
-                        label = { Text("Alasan Izin", fontSize = 13.sp) },
-                        textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                        label = { Text("Alasan Izin", fontSize = (13.sp * scaleFactor)) },
+                        minLines = 3,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        minLines = 3,
-                        maxLines = 5,
+                            .padding(vertical = (10.dp * scaleFactor)),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = primaryColor,
                             focusedLabelColor = primaryColor,
@@ -318,50 +331,76 @@ fun IzinAdminUi() {
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(15.dp))
+                    // Tombol Kamera
+                    Button(
+                        onClick = { cameraLauncher.launch(null) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF4C4C59),
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(45.dp)
+                            .padding(bottom = 8.dp),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Icon(Icons.Filled.CameraAlt, contentDescription = "Camera")
+                        Spacer(Modifier.width(8.dp))
+                        Text("Ambil Foto", fontSize = 13.sp)
+                    }
 
-                    // ✅ Tombol SIMPAN IZIN dengan redirect ke AdminMainActivity
+                    if (photoBitmap != null) {
+                        Spacer(modifier = Modifier.height((16.dp * scaleFactor)))
+                        Image(
+                            painter = rememberAsyncImagePainter(photoBitmap),
+                            contentDescription = "Preview Foto",
+                            modifier = Modifier
+                                .size((200.dp * scaleFactor))
+                                .align(Alignment.CenterHorizontally)
+                                .padding(8.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height((16.dp * scaleFactor)))
+
+                    // Tombol kirim
                     Button(
                         onClick = {
-                            if (selectedUserId == null || alasan.isEmpty()) {
+                            if (selectedUserId == null || alasan.isEmpty() || photoBase64.isEmpty()) {
                                 Toast.makeText(context, "Lengkapi semua data!", Toast.LENGTH_SHORT).show()
                             } else {
                                 scope.launch {
                                     loading = true
-                                    val success = submitIzinAdmin(
+                                    val success = submitIzinAdminWithPhoto(
                                         userId = selectedUserId!!,
                                         alasan = alasan,
                                         lat = lat,
                                         lng = lng,
                                         adminId = session.getUserId(),
-                                        placeName = placeName
+                                        placeName = placeName,
+                                        photoBase64 = photoBase64
                                     )
                                     loading = false
-
                                     if (success) {
                                         Toast.makeText(context, "Izin berhasil disimpan ✅", Toast.LENGTH_SHORT).show()
-                                        // 🔹 Kembali ke halaman utama admin
-                                        val intent = android.content.Intent(context, MainActivity::class.java)
-                                        context.startActivity(intent)
-                                        if (context is ComponentActivity) context.finish()
+                                        val i = Intent(context, MainActivity::class.java)
+                                        context.startActivity(i)
+                                        if (context is Activity) context.finish()
                                     } else {
-                                        Toast.makeText(context, "Gagal menyimpan izin ❌", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Gagal mengirim izin ❌", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = primaryColor,
-                            contentColor = Color.White
-                        ),
+                        colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(25.dp)
+                            .height((50.dp * scaleFactor)),
+                        shape = RoundedCornerShape((25.dp * scaleFactor))
                     ) {
                         Text(
-                            if (loading) "Menyimpan..." else "SIMPAN IZIN",
-                            fontSize = 14.sp,
+                            if (loading) "Mengirim..." else "KIRIM IZIN",
+                            fontSize = (13.sp * scaleFactor),
                             lineHeight = 16.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -374,43 +413,42 @@ fun IzinAdminUi() {
         }
     }
 }
+
 /**
- * 🔹 Kirim data izin ke server
+ * 🔹 Kirim data izin ke server (dengan foto base64)
  */
-suspend fun submitIzinAdmin(
+suspend fun submitIzinAdminWithPhoto(
     userId: Int,
     alasan: String,
     lat: Double,
     lng: Double,
     adminId: Int,
-    placeName: String
+    placeName: String,
+    photoBase64: String
 ): Boolean {
     return withContext(Dispatchers.IO) {
         try {
-            val client = OkHttpClient()
-            val jsonBody = JSONObject().apply {
+            val json = JSONObject().apply {
                 put("userId", userId)
                 put("requestDate", LocalDate.now().toString())
                 put("reason", alasan)
                 put("adminId", adminId)
                 put("location", "$lat,$lng")
                 put("placeName", placeName)
+                put("photoBase64", photoBase64)
             }
-
-            val mediaType = "application/json; charset=utf-8".toMediaType()
-            val requestBody = jsonBody.toString().toRequestBody(mediaType)
-
+            val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
             val request = Request.Builder()
                 .url("https://absensi.matahati.my.id/izin_admin.php")
-                .post(requestBody)
+                .post(body)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
+            val client = OkHttpClient()
             val response = client.newCall(request).execute()
-            val body = response.body?.string() ?: ""
-            println("📩 Server response: $body")
-            val json = JSONObject(body)
-            json.optBoolean("success", false)
+            val resp = response.body?.string() ?: ""
+            println("📩 Server response: $resp")
+            JSONObject(resp).optBoolean("success", false)
         } catch (e: Exception) {
             e.printStackTrace()
             false
