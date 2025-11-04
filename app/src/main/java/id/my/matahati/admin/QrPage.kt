@@ -343,10 +343,7 @@ fun QrUi() {
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 Button(
-                    onClick = {
-                        val intent = Intent(context, AbsenManual::class.java)
-                        context.startActivity(intent)
-                    },
+                    onClick = { context.launchWithSlide(AbsenManual::class.java) },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF1976D2),
                         contentColor = Color.White
@@ -356,22 +353,13 @@ fun QrUi() {
                         .height(48.dp),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text(
-                        text = "ABSEN MANUAL",
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Text("ABSEN MANUAL")
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Button(
-                    onClick = {
-                        val intent = Intent(context, IzinAdmin::class.java)
-                        context.startActivity(intent)
-                    },
+                    onClick = { context.launchWithSlide(IzinAdmin::class.java) },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFFFF9800),
                         contentColor = Color.White
@@ -381,14 +369,9 @@ fun QrUi() {
                         .height(48.dp),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text(
-                        text = "IZIN",
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Text("IZIN")
                 }
+
             }
         }
     }

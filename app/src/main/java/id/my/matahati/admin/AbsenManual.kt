@@ -3,8 +3,10 @@ package id.my.matahati.admin
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.location.Location
 import android.os.Bundle
+import android.util.Base64
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -20,6 +22,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
@@ -28,6 +32,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -54,8 +59,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
@@ -82,7 +87,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.io.IOException
+import java.io.ByteArrayOutputStream
 import kotlin.coroutines.resume
 
 object LocationCache {
@@ -93,25 +98,11 @@ object LocationCache {
 class AbsenManual : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            AbsenManualScreen()
-        }
+        setContent { AbsenManualScreen() }
     }
 }
 
-/** 🔹 Fungsi helper untuk membuat UI scaling adaptif di semua device */
-@Composable
-fun rememberAdaptiveScale(baseWidthDp: Float = 411f): Float {
-    val configuration = LocalConfiguration.current
-    val screenWidthDp = configuration.screenWidthDp.toFloat()
-    return (screenWidthDp / baseWidthDp).coerceIn(0.75f, 1.2f)
-}
-
-@Preview(
-    showBackground = true,
-    showSystemUi = true,
-    name = "Absen Manual Preview"
-)
+@Preview(showBackground = true, showSystemUi = true)
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AbsenManualScreen() {
@@ -120,23 +111,28 @@ fun AbsenManualScreen() {
     val scope = rememberCoroutineScope()
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
 
-    val activity = context as? android.app.Activity
-    val intent = activity?.intent
-
-    val adminEmail = intent?.getStringExtra("ADMIN_EMAIL")
-        ?: session.getUser()["email"] as? String
-        ?: ""
-
-    val adminPassword = intent?.getStringExtra("ADMIN_PASSWORD")
-        ?: session.getPassword()
-        ?: session.getTempPassword()
-        ?: SessionManager.SessionCache.tempPassword
-        ?: ""
+    val adminEmail = session.getUser()["email"] as? String ?: ""
+    val adminPassword = session.getPassword() ?: session.getTempPassword() ?: ""
 
     var userEmail by rememberSaveable { mutableStateOf("") }
     var userPassword by rememberSaveable { mutableStateOf("") }
     var reason by rememberSaveable { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+
+    // 🆕 foto
+    var photoBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var photoBase64 by remember { mutableStateOf<String?>(null) }
+
+    val photoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap != null) {
+            photoBitmap = bitmap
+            val output = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 80, output)
+            photoBase64 = Base64.encodeToString(output.toByteArray(), Base64.DEFAULT)
+        }
+    }
 
     val primaryColor = Color(0xFFB63352)
     val focusManager = LocalFocusManager.current
@@ -147,36 +143,25 @@ fun AbsenManualScreen() {
         LocationServices.getFusedLocationProviderClient(context)
     }
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
-
-    // Adaptive scale
     val scaleFactor = rememberAdaptiveScale()
 
-    // Permission
+    // permission lokasi
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { granted ->
             if (granted) {
                 scope.launch(Dispatchers.IO) {
-                    try {
-                        val loc = fusedLocationClient.awaitLocation(context)
-                        if (loc != null) {
-                            LocationCache.lat = loc.latitude
-                            LocationCache.lng = loc.longitude
-                            withContext(Dispatchers.Main) {
-                                lat = loc.latitude
-                                lng = loc.longitude
-                            }
-                        }
-                    } catch (e: SecurityException) {
+                    val loc = fusedLocationClient.awaitLocation(context)
+                    if (loc != null) {
+                        LocationCache.lat = loc.latitude
+                        LocationCache.lng = loc.longitude
                         withContext(Dispatchers.Main) {
-                            Toast.makeText(context, "Akses lokasi ditolak!", Toast.LENGTH_SHORT)
-                                .show()
+                            lat = loc.latitude
+                            lng = loc.longitude
                         }
                     }
                 }
-            } else {
-                Toast.makeText(context, "Izin lokasi diperlukan!", Toast.LENGTH_SHORT).show()
-            }
+            } else Toast.makeText(context, "Izin lokasi diperlukan!", Toast.LENGTH_SHORT).show()
         }
     )
 
@@ -185,28 +170,12 @@ fun AbsenManualScreen() {
                 context, Manifest.permission.ACCESS_FINE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
         ) {
-            if (LocationCache.lat != null && LocationCache.lng != null) {
-                lat = LocationCache.lat
-                lng = LocationCache.lng
-            } else {
-                scope.launch(Dispatchers.IO) {
-                    try {
-                        val loc = fusedLocationClient.awaitLocation(context)
-                        if (loc != null) {
-                            LocationCache.lat = loc.latitude
-                            LocationCache.lng = loc.longitude
-                            withContext(Dispatchers.Main) {
-                                lat = loc.latitude
-                                lng = loc.longitude
-                            }
-                        }
-                    } catch (e: SecurityException) {
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(context, "Akses lokasi ditolak!", Toast.LENGTH_SHORT)
-                                .show()
-                        }
-                    }
-                }
+            val loc = fusedLocationClient.awaitLocation(context)
+            loc?.let {
+                LocationCache.lat = it.latitude
+                LocationCache.lng = it.longitude
+                lat = it.latitude
+                lng = it.longitude
             }
         } else {
             locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -219,16 +188,12 @@ fun AbsenManualScreen() {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        // Background bawah
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height((400.dp * scaleFactor).coerceAtLeast(250.dp))
                 .align(Alignment.BottomCenter)
-                .background(
-                    color = Color(0xFFB63352),
-                    shape = RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp)
-                )
+                .background(Color(0xFFB63352))
         )
 
         Column(
@@ -238,7 +203,6 @@ fun AbsenManualScreen() {
                 .padding(top = (40.dp * scaleFactor), bottom = (24.dp * scaleFactor)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Gambar ilustrasi
             Image(
                 painter = painterResource(id = R.drawable.panaform),
                 contentDescription = "Ilustrasi Absen",
@@ -248,7 +212,6 @@ fun AbsenManualScreen() {
                 contentScale = ContentScale.Fit
             )
 
-            // Judul
             Text(
                 text = "Absen Manual",
                 style = MaterialTheme.typography.titleLarge.copy(
@@ -259,7 +222,6 @@ fun AbsenManualScreen() {
                 textAlign = TextAlign.Center
             )
 
-            // Deskripsi
             Text(
                 text = "Silahkan lakukan absen manual jika mengalami kendala dengan absen scan QR",
                 textAlign = TextAlign.Center,
@@ -273,7 +235,6 @@ fun AbsenManualScreen() {
 
             Spacer(modifier = Modifier.height((20.dp * scaleFactor)))
 
-            // Card Form
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -293,9 +254,7 @@ fun AbsenManualScreen() {
                         onValueChange = { userEmail = it },
                         label = { Text("User Email", fontSize = (13.sp * scaleFactor)) },
                         textStyle = LocalTextStyle.current.copy(fontSize = (13.sp * scaleFactor)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = (8.dp * scaleFactor)),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = primaryColor,
                             focusedLabelColor = primaryColor,
@@ -312,9 +271,7 @@ fun AbsenManualScreen() {
                         onValueChange = { userPassword = it },
                         label = { Text("User Password", fontSize = (13.sp * scaleFactor)) },
                         textStyle = LocalTextStyle.current.copy(fontSize = (13.sp * scaleFactor)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = (8.dp * scaleFactor)),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                         singleLine = true,
                         visualTransformation = if (passwordVisible)
                             VisualTransformation.None else PasswordVisualTransformation(),
@@ -352,7 +309,7 @@ fun AbsenManualScreen() {
                                     }
                                 }
                             }
-                            .padding(bottom = (16.dp * scaleFactor)),
+                            .padding(bottom = 8.dp),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = primaryColor,
@@ -364,6 +321,35 @@ fun AbsenManualScreen() {
                             focusManager.clearFocus()
                         })
                     )
+
+                    // 📸 Button Ambil Foto + Preview
+                    Button(
+                        onClick = { photoLauncher.launch(null) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF4C4C59),
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(45.dp)
+                            .padding(bottom = 8.dp),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Icon(Icons.Filled.CameraAlt, contentDescription = "Camera")
+                        Spacer(Modifier.width(8.dp))
+                        Text("Ambil Foto", fontSize = 13.sp)
+                    }
+
+                    if (photoBitmap != null) {
+                        Image(
+                            bitmap = photoBitmap!!.asImageBitmap(),
+                            contentDescription = "Preview Foto",
+                            modifier = Modifier
+                                .size((200.dp * scaleFactor))
+                                .align(Alignment.CenterHorizontally)
+                                .padding(8.dp)
+                        )
+                    }
 
                     Button(
                         onClick = {
@@ -377,6 +363,7 @@ fun AbsenManualScreen() {
                                     reason,
                                     lat,
                                     lng,
+                                    photoBase64,
                                     isLoadingSetter = { isLoading = it }
                                 )
                             }
@@ -387,14 +374,13 @@ fun AbsenManualScreen() {
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height((50.dp * scaleFactor)),
+                            .height(50.dp),
                         enabled = !isLoading,
-                        shape = RoundedCornerShape((25.dp * scaleFactor))
+                        shape = RoundedCornerShape(25.dp)
                     ) {
                         Text(
                             if (isLoading) "Mengirim..." else "KIRIM ABSEN MANUAL",
                             fontSize = (13.sp * scaleFactor),
-                            lineHeight = 16.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.fillMaxWidth(),
@@ -418,35 +404,24 @@ suspend fun handleAbsenManual(
     reason: String,
     lat: Double?,
     lng: Double?,
+    photoBase64: String?,
     isLoadingSetter: (Boolean) -> Unit
 ) {
-    if (adminEmail.isBlank() || adminPassword.isBlank()) {
-        Toast.makeText(context, "Data admin tidak ditemukan. Silakan login ulang!", Toast.LENGTH_SHORT).show()
-        return
-    }
-
     if (userEmail.isBlank() || userPassword.isBlank()) {
         Toast.makeText(context, "Isi email & password user!", Toast.LENGTH_SHORT).show()
         return
     }
-
     if (lat == null || lng == null) {
         Toast.makeText(context, "Lokasi belum tersedia!", Toast.LENGTH_SHORT).show()
         return
     }
 
     isLoadingSetter(true)
-    val result = sendManualCheckin(
-        adminEmail, adminPassword, userEmail, userPassword,
-        reason.ifBlank { "Manual check-in" }, lat, lng
-    )
-
+    val result = sendManualCheckin(adminEmail, adminPassword, userEmail, userPassword, reason, lat, lng, photoBase64)
     withContext(Dispatchers.Main) {
         isLoadingSetter(false)
         Toast.makeText(context, result, Toast.LENGTH_LONG).show()
-
-        // ✅ Jika absen berhasil, kembali ke MainActivity
-        if (result.contains("berhasil", ignoreCase = true)) {
+        if (result.contains("berhasil", true)) {
             val intent = android.content.Intent(context, MainActivity::class.java)
             context.startActivity(intent)
             if (context is ComponentActivity) context.finish()
@@ -461,11 +436,11 @@ suspend fun sendManualCheckin(
     userPassword: String,
     reason: String,
     lat: Double,
-    lng: Double
+    lng: Double,
+    photoBase64: String?
 ): String = withContext(Dispatchers.IO) {
     try {
         val url = "https://absensi.matahati.my.id/manual_checkin.php"
-
         val json = JSONObject().apply {
             put("admin_email", adminEmail)
             put("admin_password", adminPassword)
@@ -474,28 +449,16 @@ suspend fun sendManualCheckin(
             put("reason", reason)
             put("lat", lat)
             put("lng", lng)
+            if (!photoBase64.isNullOrBlank()) put("photoBase64", photoBase64)
         }
-
         val client = OkHttpClient()
         val body = json.toString().toRequestBody("application/json".toMediaType())
-
-        val request = Request.Builder()
-            .url(url)
-            .post(body)
-            .addHeader("Accept", "application/json")
-            .build()
-
+        val request = Request.Builder().url(url).post(body).addHeader("Accept", "application/json").build()
         val response = client.newCall(request).execute()
         val res = response.body?.string() ?: ""
-
         val obj = JSONObject(res)
-        if (obj.optString("status") == "ok")
-            "Absen manual berhasil dikirim!"
-        else
-            "Gagal: ${obj.optString("message")}"
-
-    } catch (e: IOException) {
-        "⚠️ Kesalahan jaringan: ${e.message}"
+        if (obj.optString("status") == "ok") "Absen manual berhasil dikirim!"
+        else "Gagal: ${obj.optString("message")}"
     } catch (e: Exception) {
         "⚠️ Error: ${e.message}"
     }
@@ -503,14 +466,12 @@ suspend fun sendManualCheckin(
 
 suspend fun FusedLocationProviderClient.awaitLocation(context: Context): Location? =
     suspendCancellableCoroutine { cont ->
-        if (ActivityCompat.checkSelfPermission(
-                context, Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED
         ) {
             cont.resume(null)
             return@suspendCancellableCoroutine
         }
-
         try {
             lastLocation
                 .addOnSuccessListener { loc -> cont.resume(loc) }
