@@ -115,19 +115,26 @@ fun QrUi() {
     var loading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var remainingTime by remember { mutableStateOf("") }
+    var qrUpdatedMessage by remember { mutableStateOf("") }
 
-    // 🔁 Auto refresh QR tiap 60 detik
+
+    // ✅ QR auto-refresh yang sinkron dengan backend
     LaunchedEffect(Unit) {
+        var currentToken: String? = null
+
         while (true) {
-            fetchAndGenerateQR(context) { bitmap, expTime, latitude, longitude, error ->
+            // Ambil QR pertama kali
+            fetchAndGenerateQR(context) { bitmap, expTime, latitude, longitude, error, token ->
                 qrBitmap = bitmap
                 expiryTime = expTime
                 lat = latitude
                 lng = longitude
                 errorMessage = error
                 loading = false
+                currentToken = token // ✅ simpan token dari server
             }
 
+            // Hitung mundur selama masa aktif token
             repeat(60) {
                 expiryTime?.let {
                     val diff = it.time - System.currentTimeMillis()
@@ -136,7 +143,38 @@ fun QrUi() {
                     val seconds = (diff % 60000) / 1000
                     remainingTime = "${minutes}m ${seconds}s"
                 }
-                delay(1000)
+
+                // ✅ Cek token setiap 10 detik
+                if (it % 10 == 0 && currentToken != null) {
+                    val used = checkTokenStatus(currentToken!!)
+                    if (used) {
+                        withContext(Dispatchers.Main) {
+                            android.widget.Toast.makeText(
+                                context,
+                                "✅ QR diperbarui otomatis!",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        }
+
+                        // 🔥 Langsung update QR di UI thread biar cepat
+                        withContext(Dispatchers.Main) {
+                            loading = true
+                        }
+
+                        fetchAndGenerateQR(context) { bitmap, expTime, latitude, longitude, error, token ->
+                            qrBitmap = bitmap
+                            expiryTime = expTime
+                            lat = latitude
+                            lng = longitude
+                            errorMessage = error
+                            loading = false
+                            currentToken = token
+                        }
+
+                        delay(1000) // beri sedikit jeda biar server sempat generate QR baru
+                        return@repeat
+                    }
+                }
             }
         }
     }
@@ -205,7 +243,6 @@ fun QrUi() {
                     }
 
                     qrBitmap != null -> {
-                        // 🔹 QR CODE YANG DIPERBESAR
                         Card(
                             shape = RoundedCornerShape(20.dp),
                             elevation = CardDefaults.cardElevation(25.dp),
@@ -213,9 +250,9 @@ fun QrUi() {
                                 containerColor = Color.White
                             ),
                             modifier = Modifier
-                                .fillMaxWidth(0.8f) // 🔹 Gunakan 90% lebar layar
-                                .aspectRatio(1f) // 🔹 Pastikan tetap persegi
-                                .padding(16.dp) // 🔹 Kurangi padding agar QR lebih besar
+                                .fillMaxWidth(0.8f)
+                                .aspectRatio(1f)
+                                .padding(16.dp)
                         ) {
                             Box(
                                 modifier = Modifier.fillMaxSize(),
@@ -225,9 +262,20 @@ fun QrUi() {
                                     bitmap = qrBitmap!!.asImageBitmap(),
                                     contentDescription = "QR Code",
                                     modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.FillBounds // 🔹 Isi penuh area
+                                    contentScale = ContentScale.FillBounds
                                 )
                             }
+                        }
+
+                        // 🟢 Tambahkan di sini
+                        if (qrUpdatedMessage.isNotEmpty()) {
+                            Text(
+                                text = qrUpdatedMessage,
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                            )
                         }
                     }
                 }
@@ -275,7 +323,7 @@ fun QrUi() {
                     onClick = {
                         scope.launch {
                             loading = true
-                            fetchAndGenerateQR(context) { bitmap, expTime, latitude, longitude, error ->
+                            fetchAndGenerateQR(context) { bitmap, expTime, latitude, longitude, error, token ->
                                 qrBitmap = bitmap
                                 expiryTime = expTime
                                 lat = latitude
@@ -353,7 +401,11 @@ fun QrUi() {
                         .height(48.dp),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("ABSEN MANUAL")
+                    Text("ABSEN MANUAL",
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis)
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -369,7 +421,11 @@ fun QrUi() {
                         .height(48.dp),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("IZIN")
+                    Text("IZIN",
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis)
                 }
 
             }
@@ -465,9 +521,10 @@ suspend fun getDeviceLocation(context: android.content.Context): Pair<Double, Do
     }
 }
 
+// ✅ Fungsi perbaikan: sekarang selalu mengembalikan token yang valid ke pemanggil
 suspend fun fetchAndGenerateQR(
     context: android.content.Context,
-    onResult: (Bitmap?, Date?, Double?, Double?, String?) -> Unit
+    onResult: (Bitmap?, Date?, Double?, Double?, String?, String?) -> Unit
 ) {
     withContext(Dispatchers.IO) {
         try {
@@ -481,15 +538,16 @@ suspend fun fetchAndGenerateQR(
             val json = JSONObject(body)
 
             if (!json.has("token")) {
-                onResult(null, null, null, null, "Token not found in response")
+                onResult(null, null, null, null, "Token not found in response", null)
                 return@withContext
             }
 
-            val token = json.getString("token")
+            val token = json.getString("token") // ✅ ambil token dari backend
             val expiryStr = json.optString("expiry", "")
             val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
             val expiryTime = sdf.parse(expiryStr)
 
+            // Ambil lokasi device
             var coords = getDeviceLocation(context)
             var retry = 0
             while (coords == null && retry < 5) {
@@ -501,6 +559,7 @@ suspend fun fetchAndGenerateQR(
             val lat = coords?.first ?: 0.0
             val lng = coords?.second ?: 0.0
 
+            // Update GPS di server
             try {
                 val formBody = okhttp3.FormBody.Builder()
                     .add("lat", lat.toString())
@@ -518,6 +577,7 @@ suspend fun fetchAndGenerateQR(
                 e.printStackTrace()
             }
 
+            // Buat QR baru dengan payload JSON
             val session = SessionManager(context)
             val userId = session.getUserId()
 
@@ -530,9 +590,10 @@ suspend fun fetchAndGenerateQR(
 
             val qrText = payload.toString()
             val bitmap = generateQrBitmap(qrText)
-            onResult(bitmap, expiryTime, lat, lng, null)
+
+            onResult(bitmap, expiryTime, lat, lng, null, token) // ✅ kirim token ke caller
         } catch (e: Exception) {
-            onResult(null, null, null, null, "Gagal memuat QR: ${e.message}")
+            onResult(null, null, null, null, "Gagal memuat QR: ${e.message}", null)
         }
     }
 }
@@ -555,4 +616,30 @@ fun generateQrBitmap(text: String, size: Int = 1000): Bitmap {
         }
     }
     return bmp
+}
+
+suspend fun checkTokenStatus(token: String): Boolean {
+    return withContext(Dispatchers.IO) {
+        try {
+            val client = OkHttpClient()
+            val request = Request.Builder()
+                .url("https://absensi.matahati.my.id/check_token_status.php?token=" +
+                        java.net.URLEncoder.encode(token, "UTF-8"))
+                .build()
+
+            val response = client.newCall(request).execute()
+            val body = response.body?.string() ?: return@withContext false
+            val json = JSONObject(body)
+
+            // Server harus kembalikan { "success": true, "fused": 1 } kalau sudah dipakai
+            if (json.optBoolean("success", false)) {
+                return@withContext json.optInt("fused", 0) == 1
+            }
+
+            false
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
 }
