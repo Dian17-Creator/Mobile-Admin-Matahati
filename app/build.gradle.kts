@@ -54,6 +54,13 @@ android {
 }
 
 dependencies {
+    val cameraxVersion = "1.3.2"
+    implementation("androidx.camera:camera-core:$cameraxVersion")
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
+
+
     // 🔹 Networking (HTTP & JSON API)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
@@ -67,6 +74,7 @@ dependencies {
 
     // 🔹 Location (for GPS Absen)
     implementation("com.google.android.gms:play-services-location:21.0.1")
+    implementation("com.google.android.gms:play-services-mlkit-face-detection:17.1.0")
 
     // 🔹 QR Code (non-MLKit, lightweight)
     implementation("com.google.zxing:core:3.5.3")

@@ -125,6 +125,7 @@ fun IzinAdminScreen() {
     var lat by remember { mutableStateOf(0.0) }
     var lng by remember { mutableStateOf(0.0) }
     var placeName by remember { mutableStateOf("Mencari lokasi...") }
+    val category = remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var photoBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var photoBase64 by remember { mutableStateOf("") }
@@ -214,7 +215,6 @@ fun IzinAdminScreen() {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        // Background bawah (warna maroon)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -230,7 +230,6 @@ fun IzinAdminScreen() {
                 .padding(top = (40.dp * scaleFactor), bottom = (24.dp * scaleFactor)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Gambar header
             Image(
                 painter = painterResource(id = R.drawable.panaform),
                 contentDescription = null,
@@ -240,7 +239,6 @@ fun IzinAdminScreen() {
                 contentScale = ContentScale.Fit
             )
 
-            // Judul
             Text(
                 text = "Form Izin (Admin)",
                 fontWeight = FontWeight.Bold,
@@ -249,7 +247,6 @@ fun IzinAdminScreen() {
                 textAlign = TextAlign.Center
             )
 
-            // Deskripsi singkat
             Text(
                 text = "Gunakan form ini untuk membuat izin manual bagi karyawan.",
                 textAlign = TextAlign.Center,
@@ -278,20 +275,66 @@ fun IzinAdminScreen() {
                         .fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Dropdown user
-                    var expanded by remember { mutableStateOf(false) }
+                    var expandedUser by remember { mutableStateOf(false) }
 
                     ExposedDropdownMenuBox(
-                        expanded = expanded,
-                        onExpandedChange = { expanded = !expanded }
+                        expanded = expandedUser,
+                        onExpandedChange = { expandedUser = !expandedUser }
                     ) {
                         OutlinedTextField(
                             value = selectedUserName,
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Pilih Karyawan", fontSize = (13.sp * scaleFactor)) },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedUser) },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = primaryColor,
+                                focusedLabelColor = primaryColor,
+                                cursorColor = primaryColor
+                            )
+                        )
+
+                        ExposedDropdownMenu(
+                            expanded = expandedUser,
+                            onDismissRequest = { expandedUser = false }
+                        ) {
+                            users.forEach { (id, name) ->
+                                DropdownMenuItem(
+                                    text = { Text(name) },
+                                    onClick = {
+                                        selectedUserId = id
+                                        selectedUserName = name
+                                        expandedUser = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height((10.dp * scaleFactor)))
+
+
+                    // 🔽 DROPDOWN KATEGORI (DIPERBAIKI TOTAL)
+                    var expandedKategori by remember { mutableStateOf(false) }
+                    val kategoriList = listOf("izin", "sakit")
+
+                    ExposedDropdownMenuBox(
+                        expanded = expandedKategori,
+                        onExpandedChange = { expandedKategori = !expandedKategori }
+                    ) {
+
+                        OutlinedTextField(
+                            value = category.value,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Kategori", fontSize = (13.sp * scaleFactor)) },
                             trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                                ExposedDropdownMenuDefaults.TrailingIcon(
+                                    expanded = expandedKategori
+                                )
                             },
                             modifier = Modifier
                                 .menuAnchor()
@@ -302,14 +345,17 @@ fun IzinAdminScreen() {
                                 cursorColor = primaryColor
                             )
                         )
-                        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                            users.forEach { (id, name) ->
+
+                        ExposedDropdownMenu(
+                            expanded = expandedKategori,
+                            onDismissRequest = { expandedKategori = false }
+                        ) {
+                            kategoriList.forEach { item ->
                                 DropdownMenuItem(
-                                    text = { Text(name) },
+                                    text = { Text(item) },
                                     onClick = {
-                                        selectedUserId = id
-                                        selectedUserName = name
-                                        expanded = false
+                                        category.value = item
+                                        expandedKategori = false
                                     }
                                 )
                             }
@@ -374,6 +420,7 @@ fun IzinAdminScreen() {
                                     val success = submitIzinAdminWithPhoto(
                                         userId = selectedUserId!!,
                                         alasan = alasan,
+                                        category = category.value,
                                         lat = lat,
                                         lng = lng,
                                         adminId = session.getUserId(),
@@ -424,6 +471,7 @@ suspend fun submitIzinAdminWithPhoto(
     lng: Double,
     adminId: Int,
     placeName: String,
+    category: String,
     photoBase64: String
 ): Boolean {
     return withContext(Dispatchers.IO) {
@@ -432,6 +480,7 @@ suspend fun submitIzinAdminWithPhoto(
                 put("userId", userId)
                 put("requestDate", LocalDate.now().toString())
                 put("reason", alasan)
+                put("category", category)
                 put("adminId", adminId)
                 put("location", "$lat,$lng")
                 put("placeName", placeName)
