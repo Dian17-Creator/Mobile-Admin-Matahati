@@ -182,11 +182,10 @@ fun QrUi() {
     // 🌈 Tampilan utama dua bagian (atas QR, bawah info)
     Column(modifier = Modifier.fillMaxSize()) {
 
-        // ===== Bagian Atas =====
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.6f) // 🔹 Tingkatkan weight untuk bagian atas
+                .weight(0.6f)
                 .background(Color(0xFFB63352)),
             contentAlignment = Alignment.Center
         ) {
@@ -194,7 +193,6 @@ fun QrUi() {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 🔹 Card waktu (jam real-time)
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -206,7 +204,6 @@ fun QrUi() {
                     CardWaktu()
                 }
 
-                // 🔹 Card lokasi sekarang
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -220,7 +217,6 @@ fun QrUi() {
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // 🔹 QR Code - BAGIAN YANG DIPERBESAR
                 when {
                     loading -> {
                         Column(
@@ -428,6 +424,31 @@ fun QrUi() {
                         overflow = TextOverflow.Ellipsis)
                 }
 
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Button(
+                    onClick = { context.launchWithSlide(RegistrasiWajahAdmin::class.java) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF4C4C4C),
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("ABSEN WAJAH",
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }
