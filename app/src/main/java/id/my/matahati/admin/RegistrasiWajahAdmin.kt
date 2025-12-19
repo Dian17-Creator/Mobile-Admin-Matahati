@@ -19,11 +19,12 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,12 +34,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -46,6 +51,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -97,6 +103,7 @@ enum class AdminFaceStatus {
     NONE,
     REGISTERED
 }
+
 private const val TAG_FACE = "ADMIN_FACE_REGISTER"
 private val httpClient by lazy { OkHttpClient() }
 private const val FACE_UPLOAD_URL = "https://absensi.matahati.my.id/admin_face_register.php"
@@ -133,8 +140,7 @@ fun cropFace(bitmap: Bitmap, face: Face): Bitmap {
     )
 }
 
-fun resizeFace(bitmap: Bitmap, size: Int = 360): Bitmap =
-    Bitmap.createScaledBitmap(bitmap, size, size, true)
+fun resizeFace(bitmap: Bitmap, size: Int = 360): Bitmap = Bitmap.createScaledBitmap(bitmap, size, size, true)
 
 class RegistrasiWajahAdmin : ComponentActivity() {
 
@@ -150,7 +156,6 @@ class RegistrasiWajahAdmin : ComponentActivity() {
                 200
             )
         }
-
         setContent {
             AdminFaceRegisterScreen()
         }
@@ -161,13 +166,13 @@ class RegistrasiWajahAdmin : ComponentActivity() {
 @Composable
 fun AdminFaceRegisterScreen() {
 
+    val primaryColor = Color(0xFFB63352)
     val context = LocalContext.current
     val session = remember { SessionManager(context) }
     val scope = rememberCoroutineScope()
 
-    val poses = listOf("Netral", "Kanan", "Kiri")
-    val poseBitmaps: SnapshotStateMap<Int, Bitmap> =
-        remember { mutableStateMapOf() }
+    val poses = listOf("Hadap Depan (Netral)", "Miring Sedikit ke Kanan", "Miring Sedikit ke Kiri")
+    val poseBitmaps: SnapshotStateMap<Int, Bitmap> = remember { mutableStateMapOf() }
 
     var users by remember { mutableStateOf(listOf<UserItem>()) }
     var selectedUser by remember { mutableStateOf<UserItem?>(null) }
@@ -177,222 +182,297 @@ fun AdminFaceRegisterScreen() {
     var isUploading by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
 
-    // 🔽 Load users
     LaunchedEffect(Unit) {
         loadUsers(session) { users = it }
     }
 
-    val nextPose =
-        (0 until poses.size).firstOrNull { !poseBitmaps.containsKey(it) }
+    val nextPose = (0 until poses.size).firstOrNull { !poseBitmaps.containsKey(it) }
+    val scrollState = rememberScrollState()
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(Color.White)
     ) {
 
-        // ===== HEADER =====
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = { (context as ComponentActivity).finish() }) {
-                Icon(Icons.Default.ArrowBack, null)
-            }
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "Registrasi Wajah",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        Text(
-            "Ikuti instruksi berikut untuk hasil yang lebih akurat",
-            fontSize = 13.sp,
-            color = Color.Gray
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(420.dp)
+                .align(Alignment.BottomCenter)
+                .background(primaryColor)
         )
 
-        Spacer(Modifier.height(12.dp))
-
-        // ===== DROPDOWN USER =====
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = !expanded }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(horizontal = 20.dp)
+                .padding(top = 32.dp, bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            OutlinedTextField(
-                value = selectedUser?.name ?: "",
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Pilih Pegawai") },
-                trailingIcon = {
-                    ExposedDropdownMenuDefaults.TrailingIcon(expanded)
-                },
-                modifier = Modifier.menuAnchor().fillMaxWidth()
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                IconButton(
+                    onClick = { (context as? android.app.Activity)?.finish() },
+                    modifier = Modifier.align(Alignment.CenterStart)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Kembali",
+                        tint = primaryColor
+                    )
+                }
+
+                Text(
+                    text = "Registrasi Wajah",
+                    fontSize = 22.sp,
+                    color = primaryColor,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Text(
+                "Ikuti instruksi berikut untuk hasil yang lebih akurat",
+                fontSize = 13.sp,
+                color = Color.Gray
             )
 
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
+            Spacer(Modifier.height(16.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                elevation = CardDefaults.cardElevation(8.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
-                users.forEach { user ->
-                    DropdownMenuItem(
-                        text = { Text(user.name) },
-                        onClick = {
-                            expanded = false
-                            selectedUser = user
-                            poseBitmaps.clear()
-                            message = null
-
-                            scope.launch {
-                                faceStatus =
-                                    if (checkUserFaceRegistered(user.id))
-                                        AdminFaceStatus.REGISTERED
-                                    else AdminFaceStatus.NONE
-                            }
-                        }
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // =====================================================
-        // ===================== UI STATE ======================
-        // =====================================================
-        when {
-            selectedUser == null -> {
-                // belum pilih user → kosong
-            }
-
-            faceStatus == AdminFaceStatus.REGISTERED -> {
-                // =====================
-                // MODE ABSENSI
-                // =====================
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier
+                        .padding(20.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        "Wajah sudah terdaftar.\nSilakan langsung absen wajah.",
-                        color = Color(0xFF2E7D32),
-                        textAlign = TextAlign.Center
-                    )
 
-                    Button(
-                        onClick = {
-                            val intent = Intent(context, AbsensiWajahAdmin::class.java).apply {
-                                putExtra("USER_ID", selectedUser!!.id)
-                            }
-                            context.startActivity(intent)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFFF9800),
-                            contentColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(10.dp)
+                    // ===== DROPDOWN USER =====
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { expanded = !expanded }
                     ) {
-                        Text(
-                            "ABSENS WAJAH",
-                            fontWeight = FontWeight.SemiBold
+                        OutlinedTextField(
+                            value = selectedUser?.name ?: "",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Pilih Pegawai") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded)
+                            },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = primaryColor,
+                                focusedLabelColor = primaryColor,
+                                cursorColor = primaryColor
+                            ),
                         )
-                    }
-                }
-            }
 
-            else -> {
-                Text(
-                    "Pose: ${nextPose?.let { poses[it] } ?: "Lengkap ✔"}",
-                    fontWeight = FontWeight.Medium
-                )
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            users.forEach { user ->
+                                DropdownMenuItem(
+                                    text = { Text(user.name) },
+                                    onClick = {
+                                        expanded = false
+                                        selectedUser = user
+                                        poseBitmaps.clear()
+                                        message = null
 
-                Spacer(Modifier.height(12.dp))
-
-                if (nextPose != null) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(360.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                    ) {
-                        AdminCameraPreview { bmp: Bitmap ->
-                            poseBitmaps[nextPose] = bmp
-                        }
-
-                        Box(
-                            Modifier
-                                .fillMaxWidth(0.7f)
-                                .aspectRatio(3f / 4f)
-                                .border(2.dp, Color.Red, RoundedCornerShape(10.dp))
-                                .align(Alignment.Center)
-                        )
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-
-                    Button(
-                        onClick = { AdminCameraController.capture() },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Ambil Foto")
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(poses.indices.toList()) { i ->
-                        poseBitmaps[i]?.let { bmp ->
-                            Image(
-                                bitmap = bmp.asImageBitmap(),
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(100.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .graphicsLayer { scaleX = -1f },
-                                contentScale = ContentScale.Crop
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                Button(
-                    enabled = poseBitmaps.size == 3 && !isUploading,
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        scope.launch {
-                            isUploading = true
-                            val ok = withContext(Dispatchers.IO) {
-                                uploadAllAdminFaces(
-                                    selectedUser!!.id,
-                                    poseBitmaps.values.toList()
+                                        scope.launch {
+                                            faceStatus =
+                                                if (checkUserFaceRegistered(user.id))
+                                                    AdminFaceStatus.REGISTERED
+                                                else AdminFaceStatus.NONE
+                                        }
+                                    }
                                 )
                             }
-                            isUploading = false
-                            if (ok) faceStatus = AdminFaceStatus.REGISTERED
                         }
                     }
-                ) {
-                    Text(if (isUploading) "Menyimpan..." else "Simpan Semua Foto")
+
+                    Spacer(Modifier.height(16.dp))
+
+                    when {
+                        selectedUser == null -> {
+                        }
+
+                        faceStatus == AdminFaceStatus.REGISTERED -> {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Text(
+                                    "Wajah sudah terdaftar!",
+                                    color = Color(0xFF2E7D32),
+                                    textAlign = TextAlign.Center
+                                )
+
+                                Button(
+                                    onClick = {
+                                        val intent = Intent(context, AbsensiWajahAdmin::class.java).apply {
+                                            putExtra("USER_ID", selectedUser!!.id)
+                                        }
+                                        context.startActivity(intent)
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFB63352),
+                                        contentColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(5.dp)
+                                ) {
+                                    Text(
+                                        "ABSENS WAJAH",
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+
+                        else -> {
+                            Text(
+                                "Pose : ${nextPose?.let { poses[it] } ?: "Lengkap ✔"}",
+                                fontWeight = FontWeight.Medium
+                            )
+
+                            Spacer(Modifier.height(5.dp))
+
+                            Text(
+                                "pastikan wajah penuh di dalam frame hijau",
+                                fontWeight = FontWeight.Normal
+                            )
+
+                            Spacer(Modifier.height(12.dp))
+
+                            if (nextPose != null) {
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(325.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                ) {
+                                    AdminCameraPreview { bmp: Bitmap ->
+                                        poseBitmaps[nextPose] = bmp
+                                    }
+
+                                    Box(
+                                        Modifier
+                                            .fillMaxWidth(0.7f)
+                                            .aspectRatio(3f / 4f)
+                                            .border(2.dp, Color.Green, RoundedCornerShape(10.dp))
+                                            .align(Alignment.Center)
+                                    )
+                                }
+
+                                Spacer(Modifier.height(12.dp))
+
+                                Button(
+                                    onClick = { AdminCameraController.capture() },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFB63352),
+                                        contentColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(5.dp),
+                                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                                ) {
+                                    Text("Ambil Foto")
+                                }
+                            }
+
+                            Spacer(Modifier.height(12.dp))
+
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(count = poses.size) { index ->
+                                val bmp = poseBitmaps[index]
+                                    if (bmp != null) {
+                                        Box {
+                                            Image(
+                                                bitmap = bmp.asImageBitmap(),
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .width(80.dp)
+                                                    .height(105.dp)
+                                                    .clip(RoundedCornerShape(10.dp))
+                                                    .graphicsLayer { scaleX = -1f },
+                                                contentScale = ContentScale.Crop
+                                            )
+
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Hapus foto",
+                                                tint = Color.White,
+                                                modifier = Modifier
+                                                    .align(Alignment.TopEnd)
+                                                    .padding(4.dp)
+                                                    .size(20.dp)
+                                                    .background(Color.Red, RoundedCornerShape(50))
+                                                    .padding(2.dp)
+                                                    .clickable {
+                                                        poseBitmaps.remove(index)
+                                                        message = "Pose dihapus, silakan ambil ulang"
+                                                    }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(Modifier.height(12.dp))
+
+                            Button(
+                                enabled = poseBitmaps.size == 3 && !isUploading,
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFB63352),
+                                    contentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(5.dp),
+                                onClick = {
+                                    scope.launch {
+                                        isUploading = true
+                                        val ok = withContext(Dispatchers.IO) {
+                                            uploadAllAdminFaces(
+                                                selectedUser!!.id,
+                                                poseBitmaps.values.toList()
+                                            )
+                                        }
+                                        isUploading = false
+                                        if (ok) faceStatus = AdminFaceStatus.REGISTERED
+                                    }
+                                }
+
+                            ) {
+                                Text(if (isUploading) "Menyimpan..." else "Simpan Semua Foto")
+                            }
+                        }
+                    }
+
+                    message?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, fontSize = 12.sp)
+                    }
                 }
             }
-        }
-
-        message?.let {
-            Spacer(Modifier.height(8.dp))
-            Text(it, fontSize = 12.sp)
         }
     }
 }
-
 
 object AdminCameraController {
     var capture: () -> Unit = {}
@@ -496,7 +576,6 @@ suspend fun checkUserFaceRegistered(userId: Int): Boolean =
             false
         }
     }
-
 suspend fun uploadAllAdminFaces(
     userId: Int,
     bitmaps: List<Bitmap>
@@ -538,7 +617,6 @@ suspend fun uploadAllAdminFaces(
             }
         }
     }
-
     return true
 }
 suspend fun loadUsers(
@@ -579,12 +657,14 @@ suspend fun loadUsers(
         }
     }
 }
+
 fun imageProxyToBitmap(image: ImageProxy): Bitmap {
     val buffer = image.planes[0].buffer
     val bytes = ByteArray(buffer.remaining())
     buffer.get(bytes)
     return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
 }
+
 fun rotateBitmap(src: Bitmap, rotation: Float): Bitmap {
     val matrix = android.graphics.Matrix().apply {
         postRotate(rotation)

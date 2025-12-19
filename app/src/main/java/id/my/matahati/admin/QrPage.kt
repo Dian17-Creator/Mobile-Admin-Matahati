@@ -196,7 +196,7 @@ fun QrUi() {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp), // 🔹 Kurangi padding
+                        .padding(horizontal = 16.dp, vertical = 4.dp), // 🔹 Kurangi padding
                     elevation = CardDefaults.cardElevation(8.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF4C4C59)),
                     shape = RoundedCornerShape(12.dp)
@@ -335,7 +335,7 @@ fun QrUi() {
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp),
+                        .height(40.dp),
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(
@@ -366,7 +366,7 @@ fun QrUi() {
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp),
+                        .height(40.dp),
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(
@@ -394,7 +394,7 @@ fun QrUi() {
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp),
+                        .height(40.dp),
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text("ABSEN MANUAL",
@@ -414,7 +414,7 @@ fun QrUi() {
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp),
+                        .height(40.dp),
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text("IZIN",
@@ -435,12 +435,12 @@ fun QrUi() {
                 Button(
                     onClick = { context.launchWithSlide(RegistrasiWajahAdmin::class.java) },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF4C4C4C),
+                        containerColor = Color(0xFFB63352),
                         contentColor = Color.White
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp),
+                        .height(40.dp),
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text("ABSEN WAJAH",
