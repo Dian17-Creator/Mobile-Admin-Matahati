@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -128,6 +129,8 @@ class AbsensiWajahAdmin : ComponentActivity() {
 @Composable
 fun AdminFaceAbsensiScreen(targetUserId: Int) {
 
+    val primaryColor = Color(0xFFB63352)
+
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val session = remember { SessionManager(context) }
@@ -183,17 +186,28 @@ fun AdminFaceAbsensiScreen(targetUserId: Int) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
             IconButton(
-                onClick = { (context as Activity).finish() },
+                onClick = { (context as? android.app.Activity)?.finish() },
                 modifier = Modifier.align(Alignment.CenterStart)
             ) {
-                Icon(Icons.Default.ArrowBack, null)
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Kembali",
+                    tint = primaryColor
+                )
             }
+
             Text(
-                "ABSENSI WAJAH (ADMIN)",
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp
+                text = "Absensi Wajah [Admin]",
+                fontSize = 22.sp,
+                color = primaryColor,
+                fontWeight = FontWeight.Bold
             )
         }
 
@@ -266,11 +280,16 @@ fun AdminFaceAbsensiScreen(targetUserId: Int) {
 
         Button(
             enabled = isCameraReady && !isUploading && !isCapturing,
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFFB63352),
+                contentColor = Color.White
+            ),
+            shape = RoundedCornerShape(5.dp),
             onClick = {
                 isCapturing = true
                 AdminCameraController.capture()
-            },
-            modifier = Modifier.fillMaxWidth().height(50.dp)
+            }
         ) {
             Text(if (isUploading) "Memindai..." else "Ambil Foto")
         }
