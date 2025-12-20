@@ -2,6 +2,7 @@ package id.my.matahati.admin
 
 import android.Manifest
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Bundle
@@ -369,17 +370,22 @@ fun AdminFaceAbsensiScreen(targetUserId: Int) {
 
                         Button(
                             onClick = {
-                                showSuccessDialog = false
+                                val intent = Intent(context, MainActivity::class.java).apply {
+                                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                                            Intent.FLAG_ACTIVITY_NEW_TASK or
+                                            Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                }
+                                context.startActivity(intent)
                                 (context as Activity).finish()
                             },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFB63352),
-                                contentColor = Color.White
-                            ),
-                            shape = RoundedCornerShape(10),
                             modifier = Modifier
                                 .width(200.dp)
-                                .height(44.dp)
+                                .height(44.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFFF6F51),
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(10.dp)
                         ) {
                             Text("OK")
                         }
