@@ -13,7 +13,11 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageProxy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -22,9 +26,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -41,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -57,7 +65,6 @@ import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetector
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -130,6 +137,7 @@ class AbsensiWajahAdmin : ComponentActivity() {
 fun AdminFaceAbsensiScreen(targetUserId: Int) {
 
     val primaryColor = Color(0xFFB63352)
+    var showSuccessDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -243,13 +251,16 @@ fun AdminFaceAbsensiScreen(targetUserId: Int) {
                             bmp, adminId, targetUserId, lat, lng, place
                         )
 
-                        statusText = result.message
-                        statusColor =
-                            if (result.success) Color(0xFF2E7D32) else Color.Red
+                        if (result.success) {
+                            statusText = ""
+                            showSuccessDialog = true
+                        } else {
+                            statusText = result.message
+                            statusColor = Color.Red
+                        }
 
                         if (result.success) {
-                            delay(1500)
-                            (context as Activity).finish()
+                            showSuccessDialog = true
                         }
 
                         isUploading = false
@@ -297,6 +308,84 @@ fun AdminFaceAbsensiScreen(targetUserId: Int) {
         if (statusText.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             Text(statusText, color = statusColor, textAlign = TextAlign.Center)
+        }
+
+        if (showSuccessDialog) {
+
+            // animasi scale + fade
+            val scale by animateFloatAsState(
+                targetValue = if (showSuccessDialog) 1f else 0.9f,
+                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+                label = "scale"
+            )
+
+            val alpha by animateFloatAsState(
+                targetValue = if (showSuccessDialog) 1f else 0f,
+                animationSpec = tween(durationMillis = 180),
+                label = "alpha"
+            )
+
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = {},
+                shape = RoundedCornerShape(3.dp),
+
+                confirmButton = {}, // ⬅️ kosong, kita handle sendiri
+
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                this.alpha = alpha
+                            }
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(7.dp) // 🔥 JARAK RAPI
+                    ) {
+
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = Color(0xFF2E7D32),
+                            modifier = Modifier.size(56.dp)
+                        )
+
+                        Text(
+                            text = "Absen Berhasil!",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Text(
+                            text = "Kembali Ke Halaman Home",
+                            fontWeight = FontWeight.Normal,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Button(
+                            onClick = {
+                                showSuccessDialog = false
+                                (context as Activity).finish()
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFB63352),
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(10),
+                            modifier = Modifier
+                                .width(200.dp)
+                                .height(44.dp)
+                        ) {
+                            Text("OK")
+                        }
+                    }
+                }
+            )
         }
     }
 }

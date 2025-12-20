@@ -247,7 +247,7 @@ fun AdminFaceRegisterScreen() {
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(10.dp),
                 elevation = CardDefaults.cardElevation(8.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
@@ -258,7 +258,6 @@ fun AdminFaceRegisterScreen() {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
 
-                    // ===== DROPDOWN USER =====
                     ExposedDropdownMenuBox(
                         expanded = expanded,
                         onExpandedChange = { expanded = !expanded }
@@ -562,7 +561,6 @@ fun AdminCameraPreview(
     })
 }
 
-
 suspend fun checkUserFaceRegistered(userId: Int): Boolean =
     withContext(Dispatchers.IO) {
         try {
@@ -647,7 +645,6 @@ suspend fun loadUsers(
                         )
                     )
                 }
-
                 withContext(Dispatchers.Main) {
                     onResult(list)
                 }
