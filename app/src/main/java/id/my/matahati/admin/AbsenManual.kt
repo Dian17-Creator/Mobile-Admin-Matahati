@@ -453,7 +453,12 @@ suspend fun sendManualCheckin(
         }
         val client = OkHttpClient()
         val body = json.toString().toRequestBody("application/json".toMediaType())
-        val request = Request.Builder().url(url).post(body).addHeader("Accept", "application/json").build()
+        val request = Request.Builder()
+            .url(url)
+            .post(body)
+            .addHeader("Accept", "application/json")
+            .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID)
+            .build()
         val response = client.newCall(request).execute()
         val res = response.body?.string() ?: ""
         val obj = JSONObject(res)

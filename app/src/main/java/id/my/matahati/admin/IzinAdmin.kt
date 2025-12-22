@@ -175,27 +175,35 @@ fun IzinAdminScreen() {
     }
 
     // Ambil daftar user
+    // Ambil daftar user (BENAR)
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             try {
                 val adminId = session.getUserId()
                 val client = OkHttpClient()
+
                 val request = Request.Builder()
                     .url("https://absensi.matahati.my.id/get_users_by_department.php?admin_id=$adminId")
+                    .get()
+                    .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID) // optional, aman
                     .build()
+
                 val response = client.newCall(request).execute()
-                val body = response.body?.string() ?: ""
-                val json = JSONObject(body)
+                val respBody = response.body?.string() ?: return@withContext
+
+                val json = JSONObject(respBody)
                 if (json.optBoolean("success", false)) {
                     val arr = json.getJSONArray("data")
                     val temp = mutableListOf<Pair<Int, String>>()
                     for (i in 0 until arr.length()) {
                         val o = arr.getJSONObject(i)
-                        temp.add(o.optInt("nid") to o.optString("cname"))
+                        temp.add(o.getInt("nid") to o.getString("cname"))
                     }
                     withContext(Dispatchers.Main) { users = temp }
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -417,7 +425,8 @@ fun IzinAdminScreen() {
                             } else {
                                 scope.launch {
                                     loading = true
-                                    val success = submitIzinAdminWithPhoto(
+
+                                    val result = submitIzinAdminWithPhoto(
                                         userId = selectedUserId!!,
                                         alasan = alasan,
                                         category = category.value,
@@ -427,14 +436,17 @@ fun IzinAdminScreen() {
                                         placeName = placeName,
                                         photoBase64 = photoBase64
                                     )
+
                                     loading = false
-                                    if (success) {
-                                        Toast.makeText(context, "Izin berhasil disimpan ✅", Toast.LENGTH_SHORT).show()
+
+                                    // 🔥 TAMPILKAN PESAN ASLI DARI BACKEND
+                                    Toast.makeText(context, result, Toast.LENGTH_LONG).show()
+
+                                    // ✅ HANYA PINDAH HALAMAN JIKA SUKSES
+                                    if (result.startsWith("✅")) {
                                         val i = Intent(context, MainActivity::class.java)
                                         context.startActivity(i)
                                         if (context is Activity) context.finish()
-                                    } else {
-                                        Toast.makeText(context, "Gagal mengirim izin ❌", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             }
@@ -473,34 +485,45 @@ suspend fun submitIzinAdminWithPhoto(
     placeName: String,
     category: String,
     photoBase64: String
-): Boolean {
-    return withContext(Dispatchers.IO) {
-        try {
-            val json = JSONObject().apply {
-                put("userId", userId)
-                put("requestDate", LocalDate.now().toString())
-                put("reason", alasan)
-                put("category", category)
-                put("adminId", adminId)
-                put("location", "$lat,$lng")
-                put("placeName", placeName)
-                put("photoBase64", photoBase64)
-            }
-            val body = json.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-            val request = Request.Builder()
-                .url("https://absensi.matahati.my.id/izin_admin.php")
-                .post(body)
-                .addHeader("Content-Type", "application/json")
-                .build()
-
-            val client = OkHttpClient()
-            val response = client.newCall(request).execute()
-            val resp = response.body?.string() ?: ""
-            println("📩 Server response: $resp")
-            JSONObject(resp).optBoolean("success", false)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
+): String = withContext(Dispatchers.IO) {
+    try {
+        val json = JSONObject().apply {
+            put("userId", userId)
+            put("requestDate", LocalDate.now().toString())
+            put("reason", alasan)
+            put("category", category)
+            put("adminId", adminId)
+            put("location", "$lat,$lng")
+            put("placeName", placeName)
+            put("photoBase64", photoBase64)
         }
+
+        val body = json
+            .toString()
+            .toRequestBody("application/json; charset=utf-8".toMediaType())
+
+        val request = Request.Builder()
+            .url("https://absensi.matahati.my.id/izin_admin.php")
+            .post(body)
+            .addHeader("Content-Type", "application/json")
+            .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID) // 🔒 DEVICE GATE
+            .build()
+
+        val client = OkHttpClient()
+        val response = client.newCall(request).execute()
+        val respBody = response.body?.string().orEmpty()
+
+        val obj = JSONObject(respBody)
+        val success = obj.optBoolean("success", false)
+        val message = obj.optString("message", "Terjadi kesalahan")
+
+        if (success) {
+            "✅ $message"
+        } else {
+            "❌ $message"
+        }
+
+    } catch (e: Exception) {
+        "⚠️ Error jaringan: ${e.message}"
     }
 }

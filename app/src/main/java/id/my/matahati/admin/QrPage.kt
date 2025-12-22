@@ -449,6 +449,26 @@ fun QrUi() {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis)
                 }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Button(
+                    onClick = { context.launchWithSlide(DeviceInfoAdminActivity::class.java) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFB63352),
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("ANDROID ID",
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }

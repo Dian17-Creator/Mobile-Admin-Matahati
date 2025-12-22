@@ -51,6 +51,11 @@ class SessionManager(context: Context) {
 
     fun getUserId(): Int = prefs.getInt(KEY_ID, -1)
     fun getPassword(): String? = prefs.getString(KEY_PASSWORD, null)
+    fun getName(): String? = prefs.getString(KEY_NAME, null)
+    fun getEmail(): String? = prefs.getString(KEY_EMAIL, null)
+
+    fun getUserName(): String? = prefs.getString(KEY_NAME, null)
+    fun getUserEmail(): String? = prefs.getString(KEY_EMAIL, null)
 
     fun getUser(): Map<String, Any?> = mapOf(
         "id" to prefs.getInt(KEY_ID, -1),
