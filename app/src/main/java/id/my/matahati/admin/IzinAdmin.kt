@@ -417,7 +417,6 @@ fun IzinAdminScreen() {
 
                     Spacer(modifier = Modifier.height((16.dp * scaleFactor)))
 
-                    // Tombol kirim
                     Button(
                         onClick = {
                             if (selectedUserId == null || alasan.isEmpty() || photoBase64.isEmpty()) {
@@ -439,10 +438,8 @@ fun IzinAdminScreen() {
 
                                     loading = false
 
-                                    // 🔥 TAMPILKAN PESAN ASLI DARI BACKEND
                                     Toast.makeText(context, result, Toast.LENGTH_LONG).show()
 
-                                    // ✅ HANYA PINDAH HALAMAN JIKA SUKSES
                                     if (result.startsWith("✅")) {
                                         val i = Intent(context, MainActivity::class.java)
                                         context.startActivity(i)

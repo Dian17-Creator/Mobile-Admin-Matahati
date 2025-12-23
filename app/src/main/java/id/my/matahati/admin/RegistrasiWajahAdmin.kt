@@ -169,6 +169,7 @@ fun AdminFaceRegisterScreen() {
     val primaryColor = Color(0xFFB63352)
     val context = LocalContext.current
     val session = remember { SessionManager(context) }
+    val adminId = session.getUserId()
     val scope = rememberCoroutineScope()
 
     val poses = listOf("Hadap Depan (Netral)", "Miring Sedikit ke Kanan", "Miring Sedikit ke Kiri")
@@ -444,12 +445,14 @@ fun AdminFaceRegisterScreen() {
                                 ),
                                 shape = RoundedCornerShape(5.dp),
                                 onClick = {
+                                    val orderedBitmaps = (0..2).mapNotNull { poseBitmaps[it] }
                                     scope.launch {
                                         isUploading = true
                                         val ok = withContext(Dispatchers.IO) {
                                             uploadAllAdminFaces(
-                                                selectedUser!!.id,
-                                                poseBitmaps.values.toList()
+                                                adminId = adminId,
+                                                userId = selectedUser!!.id,
+                                                bitmaps = orderedBitmaps
                                             )
                                         }
                                         isUploading = false
@@ -574,7 +577,9 @@ suspend fun checkUserFaceRegistered(userId: Int): Boolean =
             false
         }
     }
+
 suspend fun uploadAllAdminFaces(
+    adminId: Int,
     userId: Int,
     bitmaps: List<Bitmap>
 ): Boolean {
@@ -588,6 +593,7 @@ suspend fun uploadAllAdminFaces(
         val base64 = Base64.encodeToString(bos.toByteArray(), Base64.NO_WRAP)
 
         val json = JSONObject().apply {
+            put("adminId", adminId)
             put("userId", userId)
             put("pose", index) // ⬅️ PENTING
             put("photoBase64", base64)
@@ -598,6 +604,7 @@ suspend fun uploadAllAdminFaces(
 
         val req = Request.Builder()
             .url(FACE_UPLOAD_URL)
+            .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID) // optional, aman
             .post(body)
             .build()
 
@@ -626,6 +633,7 @@ suspend fun loadUsers(
             val adminId = session.getUserId()
             val req = Request.Builder()
                 .url("https://absensi.matahati.my.id/get_users_by_department.php?admin_id=$adminId")
+                .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID) // optional, aman
                 .build()
 
             val res = httpClient.newCall(req).execute()
