@@ -79,9 +79,9 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 private const val TAG_ADMIN_ABSEN = "ADMIN_FACE_ABSEN"
-private const val ADMIN_FACE_ABSEN_URL = "https://absensi.matahati.my.id/user_face_scan_mobile.php"
-
+private const val ADMIN_FACE_ABSEN_URL = "https://absensi.matahati.my.id/admin_face_scan_mobile.php"
 private const val API_KEY = "MH4T4H4TI_2025_ABSENSI_APP_SECRETx9P2F7Q1L8S3Z0R6W4K2D1M9B7T5"
+private const val MSG_DEVICE_NOT_REGISTERED = "Device belum terdaftar"
 
 private val httpClient by lazy {
     OkHttpClient.Builder()
@@ -517,20 +517,29 @@ suspend fun uploadAdminFaceAbsensi(
 
         val request = Request.Builder()
             .url(ADMIN_FACE_ABSEN_URL)
+            .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID) // optional, aman
             .post(body)
             .build()
 
         httpClient.newCall(request).execute().use { resp ->
             val txt = resp.body?.string() ?: ""
-            if (!resp.isSuccessful || txt.isEmpty()) {
+
+            // ❗ hanya cek body kosong
+            if (txt.isEmpty()) {
                 return@withContext AdminFaceResponse(false, "Server No RESPONS")
             }
 
             val obj = JSONObject(txt)
-            AdminFaceResponse(
-                obj.optBoolean("success", false),
-                obj.optString("message", "Absensi gagal")
-            )
+
+            val success = obj.optBoolean("success", false)
+            val message = obj.optString("message", "Absensi gagal")
+
+            // 🔒 HANDLE DEVICE BELUM TERDAFTAR
+            if (!success && message.contains("device", ignoreCase = true)) {
+                return@withContext AdminFaceResponse(false, MSG_DEVICE_NOT_REGISTERED)
+            }
+
+            return@withContext AdminFaceResponse(success, message)
         }
     } catch (e: Exception) {
         Log.e(TAG_ADMIN_ABSEN, "Upload error", e)

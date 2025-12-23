@@ -10,24 +10,34 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -283,7 +294,7 @@ fun QrUi() {
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(0.4f) // 🔹 Sesuaikan weight
-                .padding(horizontal = 16.dp, vertical = 16.dp), // 🔹 Kurangi padding
+                .padding(horizontal = 2.dp, vertical = 16.dp), // 🔹 Kurangi padding
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Informasi QR
@@ -311,163 +322,99 @@ fun QrUi() {
             )
 
             // 🔘 Tombol Refresh dan Logout
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+            val listState = rememberLazyListState()
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(125.dp)
+                    .padding(horizontal = 15.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(4.dp)
             ) {
-                Button(
-                    onClick = {
-                        scope.launch {
-                            loading = true
-                            fetchAndGenerateQR(context) { bitmap, expTime, latitude, longitude, error, token ->
-                                qrBitmap = bitmap
-                                expiryTime = expTime
-                                lat = latitude
-                                lng = longitude
-                                errorMessage = error
-                                loading = false
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center // ✅ KUNCI UTAMA
+                ) {
+                    LazyRow(
+                        state = listState,
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(horizontal = 5.dp)
+                    ) {
+
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.Refresh,
+                                label = "Refresh",
+                            ) {
+                                scope.launch {
+                                    loading = true
+                                    fetchAndGenerateQR(context) { bitmap, expTime, latitude, longitude, error, token ->
+                                        qrBitmap = bitmap
+                                        expiryTime = expTime
+                                        lat = latitude
+                                        lng = longitude
+                                        errorMessage = error
+                                        loading = false
+                                    }
+                                }
                             }
                         }
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF4CAF50),
-                        contentColor = Color.White
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text(
-                        text = "REFRESH TOKEN",
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
 
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Button(
-                    onClick = {
-                        if (session.isRememberMe()) {
-                            session.clearSession()
-                        } else {
-                            session.clearLoginButKeepTemp()
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.Edit,
+                                label = "Manual",
+                            ) {
+                                context.launchWithSlide(AbsenManual::class.java)
+                            }
                         }
-                        val intent = Intent(context, LoginPage::class.java)
-                        context.startActivity(intent)
-                        if (context is ComponentActivity) context.finish()
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFF0000),
-                        contentColor = Color.White
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text(
-                        text = "LOGOUT",
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
 
-            Spacer(modifier = Modifier.height(12.dp))
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.Event,
+                                label = "Izin",
+                            ) {
+                                context.launchWithSlide(IzinAdmin::class.java)
+                            }
+                        }
 
-            // 🔘 Tombol Absen Manual & Izin Manual
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                Button(
-                    onClick = { context.launchWithSlide(AbsenManual::class.java) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF1976D2),
-                        contentColor = Color.White
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("ABSEN MANUAL",
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis)
-                }
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.Face,
+                                label = "Face",
+                            ) {
+                                context.launchWithSlide(RegistrasiWajahAdmin::class.java)
+                            }
+                        }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.PhoneAndroid,
+                                label = "ID",
+                            ) {
+                                context.launchWithSlide(DeviceInfoAdminActivity::class.java)
+                            }
+                        }
 
-                Button(
-                    onClick = { context.launchWithSlide(IzinAdmin::class.java) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFF9800),
-                        contentColor = Color.White
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("IZIN",
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis)
-                }
-
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                Button(
-                    onClick = { context.launchWithSlide(RegistrasiWajahAdmin::class.java) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFB63352),
-                        contentColor = Color.White
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("ABSEN WAJAH",
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis)
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Button(
-                    onClick = { context.launchWithSlide(DeviceInfoAdminActivity::class.java) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFB63352),
-                        contentColor = Color.White
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("ANDROID ID",
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis)
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.Logout,
+                                label = "Logout",
+                            ) {
+                                if (session.isRememberMe()) {
+                                    session.clearSession()
+                                } else {
+                                    session.clearLoginButKeepTemp()
+                                }
+                                val intent = Intent(context, LoginPage::class.java)
+                                context.startActivity(intent)
+                                if (context is ComponentActivity) context.finish()
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -682,5 +629,52 @@ suspend fun checkTokenStatus(token: String): Boolean {
             e.printStackTrace()
             false
         }
+    }
+}
+
+@Composable
+fun ActionCard(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(72.dp)
+    ) {
+
+        Card(
+            modifier = Modifier
+                .size(56.dp)
+                .clickable { onClick() },
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.White
+            ),
+            elevation = CardDefaults.cardElevation(3.dp)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = Color(0xFFB63352), // 🔥 MAROON
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+            color = Color(0xFFB63352), // 🔥 MAROON
+            maxLines = 2,
+            lineHeight = 14.sp
+        )
     }
 }
