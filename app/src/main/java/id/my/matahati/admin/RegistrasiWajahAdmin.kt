@@ -38,7 +38,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -49,7 +48,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -219,16 +217,16 @@ fun AdminFaceRegisterScreen() {
                     .padding(bottom = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
-                IconButton(
-                    onClick = { (context as? android.app.Activity)?.finish() },
-                    modifier = Modifier.align(Alignment.CenterStart)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Kembali",
-                        tint = primaryColor
-                    )
-                }
+//                IconButton(
+//                    onClick = { (context as? android.app.Activity)?.finish() },
+//                    modifier = Modifier.align(Alignment.CenterStart)
+//                ) {
+//                    Icon(
+//                        imageVector = Icons.Default.ArrowBack,
+//                        contentDescription = "Kembali",
+//                        tint = primaryColor
+//                    )
+//                }
 
                 Text(
                     text = "Registrasi Wajah",

@@ -2,6 +2,7 @@ package id.my.matahati.admin
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.location.Geocoder
@@ -386,7 +387,7 @@ fun QrUi() {
                                 icon = Icons.Default.Face,
                                 label = "Face",
                             ) {
-                                context.launchWithSlide(RegistrasiWajahAdmin::class.java)
+                                context.launchWithSlide(AbsensiWajahAdmin::class.java)
                             }
                         }
 
@@ -498,11 +499,27 @@ fun CardLokasi(lat: Double?, lng: Double?) {
 }
 
 @SuppressLint("MissingPermission")
-suspend fun getDeviceLocation(context: android.content.Context): Pair<Double, Double>? {
+suspend fun getDeviceLocation(context: Context): Pair<Double, Double>? {
     return try {
         val fused = LocationServices.getFusedLocationProviderClient(context)
-        val location = fused.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null).await()
-        if (location != null) Pair(location.latitude, location.longitude) else null
+
+        // 🔹 coba last known location dulu (PALING STABIL)
+        val last = fused.lastLocation.await()
+        if (last != null && last.latitude != 0.0 && last.longitude != 0.0) {
+            return Pair(last.latitude, last.longitude)
+        }
+
+        // 🔹 fallback ke current location
+        val current = fused.getCurrentLocation(
+            Priority.PRIORITY_HIGH_ACCURACY,
+            null
+        ).await()
+
+        if (current != null && current.latitude != 0.0 && current.longitude != 0.0) {
+            return Pair(current.latitude, current.longitude)
+        }
+
+        null
     } catch (e: Exception) {
         e.printStackTrace()
         null
@@ -544,10 +561,14 @@ suspend fun fetchAndGenerateQR(
                 retry++
             }
 
-            val lat = coords?.first ?: 0.0
-            val lng = coords?.second ?: 0.0
+            if (coords == null) {
+                onResult(null, null, null, null, "Menunggu GPS aktif...", null)
+                return@withContext
+            }
 
-            // Update GPS di server
+            val lat = coords.first
+            val lng = coords.second
+
             try {
                 val formBody = okhttp3.FormBody.Builder()
                     .add("lat", lat.toString())

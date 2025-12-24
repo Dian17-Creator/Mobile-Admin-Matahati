@@ -126,16 +126,14 @@ class AbsensiWajahAdmin : ComponentActivity() {
             )
         }
 
-        val targetUserId = intent.getIntExtra("USER_ID", -1)
-
         setContent {
-            AdminFaceAbsensiScreen(targetUserId)
+            AdminFaceAbsensiScreen()
         }
     }
 }
 
 @Composable
-fun AdminFaceAbsensiScreen(targetUserId: Int) {
+fun AdminFaceAbsensiScreen() {
 
     val primaryColor = Color(0xFFB63352)
     var showSuccessDialog by remember { mutableStateOf(false) }
@@ -202,7 +200,12 @@ fun AdminFaceAbsensiScreen(targetUserId: Int) {
             contentAlignment = Alignment.Center
         ) {
             IconButton(
-                onClick = { (context as? android.app.Activity)?.finish() },
+                onClick = {
+                    val intent = Intent(context, QrPage::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    }
+                    context.startActivity(intent)
+                },
                 modifier = Modifier.align(Alignment.CenterStart)
             ) {
                 Icon(
@@ -239,17 +242,10 @@ fun AdminFaceAbsensiScreen(targetUserId: Int) {
                         return@AdminFaceAbsensiCamera
                     }
 
-                    if (targetUserId <= 0) {
-                        statusText = "User target tidak valid"
-                        statusColor = Color.Red
-                        isCapturing = false
-                        return@AdminFaceAbsensiCamera
-                    }
-
                     scope.launch {
                         isUploading = true
-                        val result = uploadAdminFaceAbsensi(
-                            bmp, adminId, targetUserId, lat, lng, place
+                        val result = uploadAdminFaceLogin(
+                            bmp, adminId, lat, lng, place
                         )
 
                         if (result.success) {
@@ -304,6 +300,26 @@ fun AdminFaceAbsensiScreen(targetUserId: Int) {
             }
         ) {
             Text(if (isUploading) "Memindai..." else "Ambil Foto")
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        Button(
+            enabled = isCameraReady && !isUploading && !isCapturing,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFFB63352),
+                contentColor = Color.White
+            ),
+            shape = RoundedCornerShape(5.dp),
+            onClick = {
+                val intent = Intent(context, RegistrasiWajahAdmin::class.java)
+                context.startActivity(intent)
+            }
+        ) {
+            Text("Registrasi Wajah")
         }
 
         if (statusText.isNotEmpty()) {
@@ -486,10 +502,9 @@ data class AdminFaceResponse(
     val message: String
 )
 
-suspend fun uploadAdminFaceAbsensi(
+suspend fun uploadAdminFaceLogin(
     bitmap: Bitmap,
     adminId: Int,
-    targetUserId: Int,
     lat: Double?,
     lng: Double?,
     place: String?
@@ -503,7 +518,6 @@ suspend fun uploadAdminFaceAbsensi(
             .setType(MultipartBody.FORM)
             .addFormDataPart("api_key", API_KEY)
             .addFormDataPart("adminId", adminId.toString())
-            .addFormDataPart("userId", targetUserId.toString()) // ⬅️ FIX
             .addFormDataPart("lat", lat?.toString() ?: "")
             .addFormDataPart("lng", lng?.toString() ?: "")
             .addFormDataPart("place", place ?: "")
@@ -514,35 +528,31 @@ suspend fun uploadAdminFaceAbsensi(
             )
             .build()
 
-
         val request = Request.Builder()
-            .url(ADMIN_FACE_ABSEN_URL)
-            .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID) // optional, aman
+            .url("https://absensi.matahati.my.id/admin_face_scan_mobile.php")
+            .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID)
             .post(body)
             .build()
 
         httpClient.newCall(request).execute().use { resp ->
             val txt = resp.body?.string() ?: ""
-
-            // ❗ hanya cek body kosong
             if (txt.isEmpty()) {
-                return@withContext AdminFaceResponse(false, "Server No RESPONS")
+                return@withContext AdminFaceResponse(false, "Server tidak merespons")
             }
 
             val obj = JSONObject(txt)
-
             val success = obj.optBoolean("success", false)
-            val message = obj.optString("message", "Absensi gagal")
+            val message = obj.optString("message", "Login wajah gagal")
 
-            // 🔒 HANDLE DEVICE BELUM TERDAFTAR
-            if (!success && message.contains("device", ignoreCase = true)) {
+            if (!success && message.contains("device", true)) {
                 return@withContext AdminFaceResponse(false, MSG_DEVICE_NOT_REGISTERED)
             }
 
             return@withContext AdminFaceResponse(success, message)
         }
+
     } catch (e: Exception) {
-        Log.e(TAG_ADMIN_ABSEN, "Upload error", e)
+        Log.e(TAG_ADMIN_ABSEN, "Face login error", e)
         AdminFaceResponse(false, "Koneksi gagal")
     }
 }
