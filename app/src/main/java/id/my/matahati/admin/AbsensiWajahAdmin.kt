@@ -21,6 +21,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,16 +31,32 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -66,6 +84,7 @@ import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetector
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -77,6 +96,7 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+
 
 private const val TAG_ADMIN_ABSEN = "ADMIN_FACE_ABSEN"
 private const val ADMIN_FACE_ABSEN_URL = "https://absensi.matahati.my.id/admin_face_scan_mobile.php"
@@ -132,6 +152,7 @@ class AbsensiWajahAdmin : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminFaceAbsensiScreen() {
 
@@ -155,36 +176,62 @@ fun AdminFaceAbsensiScreen() {
     var lng by remember { mutableStateOf<Double?>(null) }
     var place by remember { mutableStateOf("Mengambil lokasi...") }
 
+    var cameraEnabled by remember { mutableStateOf(false) }
+    var locationEnabled by remember { mutableStateOf(false) }
+
+    var selectedDuration by remember { mutableStateOf(15) }
+    var remainingSeconds by remember { mutableStateOf(0) }
+    var isTimerRunning by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
-        val activity = context as Activity
+        // default aktif saat halaman dibuka
+        cameraEnabled = true
+        locationEnabled = true
+        remainingSeconds = selectedDuration * 60 // default 15 menit
+        isTimerRunning = true
+    }
 
-        val hasPermission =
-            ContextCompat.checkSelfPermission(
-                activity,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED ||
-                    ContextCompat.checkSelfPermission(
-                        activity,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    ) == PackageManager.PERMISSION_GRANTED
+    LaunchedEffect(isTimerRunning) {
+        if (!isTimerRunning) return@LaunchedEffect
 
-        if (!hasPermission) {
-            place = "Lokasi tidak diizinkan"
+        while (remainingSeconds > 0) {
+            delay(1000)
+            remainingSeconds--
+        }
+
+        // ⛔ AUTO OFF
+        cameraEnabled = false
+        locationEnabled = false
+        isTimerRunning = false
+    }
+
+    LaunchedEffect(locationEnabled) {
+        if (!locationEnabled) {
+            place = "📍 Lokasi dimatikan"
+            lat = null
+            lng = null
             return@LaunchedEffect
         }
 
-        val fused = LocationServices.getFusedLocationProviderClient(activity)
-        fused.lastLocation.addOnSuccessListener { loc ->
-            if (loc != null) {
-                lat = loc.latitude
-                lng = loc.longitude
-                scope.launch {
-                    val name = reverseGeocode(loc.latitude, loc.longitude)
-                    place = if (name.isNotEmpty()) name else "${lat}, ${lng}"
+        try {
+            val activity = context as Activity
+            val fused = LocationServices.getFusedLocationProviderClient(activity)
+
+            fused.lastLocation.addOnSuccessListener { loc ->
+                if (loc != null) {
+                    lat = loc.latitude
+                    lng = loc.longitude
+                    scope.launch {
+                        place = reverseGeocode(loc.latitude, loc.longitude)
+                    }
+                } else {
+                    place = "Lokasi tidak tersedia"
                 }
-            } else {
-                place = "Lokasi tidak tersedia"
             }
+        } catch (e: SecurityException) {
+            place = "Izin lokasi belum diberikan"
+            lat = null
+            lng = null
         }
     }
 
@@ -193,79 +240,132 @@ fun AdminFaceAbsensiScreen() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        Box(
+        var expanded by remember { mutableStateOf(false) }
+
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp),
-            contentAlignment = Alignment.Center
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            IconButton(
-                onClick = {
-                    val intent = Intent(context, QrPage::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    }
-                    context.startActivity(intent)
-                },
-                modifier = Modifier.align(Alignment.CenterStart)
+
+            // ⏱️ DROPDOWN DURASI (STYLE FIELD)
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { expanded = !expanded },
+                modifier = Modifier.weight(1f)
             ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Kembali",
-                    tint = primaryColor
+                OutlinedTextField(
+                    value = "$selectedDuration menit",
+                    onValueChange = {},
+                    readOnly = true,
+                    leadingIcon = { Text("⏱️") },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                    },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = primaryColor,
+                        focusedLabelColor = primaryColor,
+                        cursorColor = primaryColor
+                    )
                 )
+
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    listOf(5, 10, 15, 30).forEach { minute ->
+                        DropdownMenuItem(
+                            text = { Text("$minute menit") },
+                            onClick = {
+                                selectedDuration = minute
+                                expanded = false
+                            }
+                        )
+                    }
+                }
             }
 
+            // ⏳ COUNTDOWN
+            val min = remainingSeconds / 60
+            val sec = remainingSeconds % 60
+
             Text(
-                text = "Absensi Wajah [Admin]",
-                fontSize = 22.sp,
-                color = primaryColor,
-                fontWeight = FontWeight.Bold
+                text = if (isTimerRunning)
+                    "%02d:%02d".format(min, sec)
+                else "--:--",
+                fontSize = 13.sp,
+                color = Color.Gray,
+                modifier = Modifier.width(60.dp),
+                textAlign = TextAlign.Center
             )
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(2.dp))
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(420.dp)
-                .clip(RoundedCornerShape(16.dp)),
+                .height(355.dp)
+                .clip(RoundedCornerShape(10.dp)),
             contentAlignment = Alignment.Center
         ) {
-            AdminFaceAbsensiCamera(
-                onReady = { isCameraReady = true },
-                onCaptured = { bmp ->
-                    if (bmp == null) {
-                        statusText = "Wajah tidak valid"
-                        statusColor = Color.Red
-                        isCapturing = false
-                        return@AdminFaceAbsensiCamera
-                    }
-
-                    scope.launch {
-                        isUploading = true
-                        val result = uploadAdminFaceLogin(
-                            bmp, adminId, lat, lng, place
-                        )
-
-                        if (result.success) {
-                            statusText = ""
-                            showSuccessDialog = true
-                        } else {
-                            statusText = result.message
+            if (cameraEnabled) {
+                AdminFaceAbsensiCamera(
+                    onReady = { isCameraReady = true },
+                    onCaptured = { bmp ->
+                        if (bmp == null) {
+                            statusText = "Wajah tidak valid"
                             statusColor = Color.Red
+                            isCapturing = false
+                            return@AdminFaceAbsensiCamera
                         }
 
-                        if (result.success) {
-                            showSuccessDialog = true
-                        }
+                        scope.launch {
+                            isUploading = true
 
-                        isUploading = false
-                        isCapturing = false
+                            val result = uploadAdminFaceLogin(
+                                bmp,
+                                adminId,
+                                lat,
+                                lng,
+                                place
+                            )
+
+                            isUploading = false
+                            isCapturing = false
+
+                            if (result.success) {
+                                showSuccessDialog = true
+                                statusText = ""
+                            } else {
+                                statusText = result.message
+                                statusColor = Color.Red
+                            }
+                        }
                     }
+                )
+            } else {
+                // 🔋 Kamera OFF (hemat baterai)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .border(2.dp, Color.Gray, RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "📷 Kamera dimatikan\nTekan Aktifkan untuk menyalakan",
+                        textAlign = TextAlign.Center,
+                        color = Color.Gray
+                    )
                 }
-            )
+            }
 
+            // frame hijau tetap
             Box(
                 Modifier
                     .fillMaxWidth(0.7f)
@@ -300,26 +400,6 @@ fun AdminFaceAbsensiScreen() {
             }
         ) {
             Text(if (isUploading) "Memindai..." else "Ambil Foto")
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        Button(
-            enabled = isCameraReady && !isUploading && !isCapturing,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFB63352),
-                contentColor = Color.White
-            ),
-            shape = RoundedCornerShape(5.dp),
-            onClick = {
-                val intent = Intent(context, RegistrasiWajahAdmin::class.java)
-                context.startActivity(intent)
-            }
-        ) {
-            Text("Registrasi Wajah")
         }
 
         if (statusText.isNotEmpty()) {
@@ -378,7 +458,7 @@ fun AdminFaceAbsensiScreen() {
                         )
 
                         Text(
-                            text = "Kembali Ke Halaman Home",
+                            text = "Absen Anda Sudah Tercatat",
                             fontWeight = FontWeight.Normal,
                             fontSize = 14.sp,
                             textAlign = TextAlign.Center
@@ -386,13 +466,7 @@ fun AdminFaceAbsensiScreen() {
 
                         Button(
                             onClick = {
-                                val intent = Intent(context, MainActivity::class.java).apply {
-                                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                                            Intent.FLAG_ACTIVITY_NEW_TASK or
-                                            Intent.FLAG_ACTIVITY_CLEAR_TASK
-                                }
-                                context.startActivity(intent)
-                                (context as Activity).finish()
+                                showSuccessDialog = false
                             },
                             modifier = Modifier
                                 .width(200.dp)
@@ -409,6 +483,117 @@ fun AdminFaceAbsensiScreen() {
                 }
             )
         }
+
+        Spacer(Modifier.height(5.dp))
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(0.4f) // 🔹 Sesuaikan weight
+                .padding(horizontal = 0.dp, vertical = 5.dp), // 🔹 Kurangi padding
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // 🔘 Tombol Refresh dan Logout
+            val listState = rememberLazyListState()
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(125.dp)
+                    .padding(horizontal = 0.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(4.dp)
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center // ✅ KUNCI UTAMA
+                ) {
+                    LazyRow(
+                        state = listState,
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(horizontal = 5.dp)
+                    ) {
+
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.Refresh,
+                                label = "Refresh",
+                            ) {
+                                cameraEnabled = true
+                                locationEnabled = true
+                                remainingSeconds = selectedDuration * 60
+                                isTimerRunning = true
+                            }
+                        }
+
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.Face,
+                                label = "Face Register",
+                            ) {
+                                context.launchWithSlide(RegistrasiWajahAdmin::class.java)
+                            }
+                        }
+
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.QrCode2,
+                                label = "QR",
+                            ) {
+                                context.launchWithSlide(QrPage::class.java)
+                            }
+                        }
+
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.PhoneAndroid,
+                                label = "ID",
+                            ) {
+                                context.launchWithSlide(DeviceInfoAdminActivity::class.java)
+                            }
+                        }
+
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.Edit,
+                                label = "Manual",
+                            ) {
+                                context.launchWithSlide(AbsenManual::class.java)
+                            }
+                        }
+
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.Event,
+                                label = "Izin",
+                            ) {
+                                context.launchWithSlide(IzinAdmin::class.java)
+                            }
+                        }
+
+
+
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.Logout,
+                                label = "Logout",
+                            ) {
+                                if (session.isRememberMe()) {
+                                    session.clearSession()
+                                } else {
+                                    session.clearLoginButKeepTemp()
+                                }
+                                val intent = Intent(context, LoginPage::class.java)
+                                context.startActivity(intent)
+                                if (context is ComponentActivity) context.finish()
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -417,83 +602,91 @@ fun AdminFaceAbsensiCamera(
     onReady: () -> Unit,
     onCaptured: (Bitmap?) -> Unit
 ) {
+    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val executor = remember { Executors.newSingleThreadExecutor() }
 
+    val previewView = remember {
+        PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+        }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val cameraProvider = ProcessCameraProvider.getInstance(context).get()
+
+        val preview = androidx.camera.core.Preview.Builder().build().apply {
+            setSurfaceProvider(previewView.surfaceProvider)
+        }
+
+        val imageCapture = ImageCapture.Builder().build()
+
+        AdminCameraController.capture = {
+            imageCapture.takePicture(
+                executor,
+                object : ImageCapture.OnImageCapturedCallback() {
+                    override fun onCaptureSuccess(image: ImageProxy) {
+                        try {
+                            val bmp = imageProxyToBitmap(image)
+                            val rotated = rotateBitmap(
+                                bmp,
+                                image.imageInfo.rotationDegrees.toFloat()
+                            )
+
+                            val input = InputImage.fromBitmap(rotated, 0)
+
+                            AdminFaceAbsenDetector.detector
+                                .process(input)
+                                .addOnSuccessListener { faces ->
+                                    if (faces.size != 1) {
+                                        onCaptured(null)
+                                        return@addOnSuccessListener
+                                    }
+
+                                    val face = faces.first()
+                                    if (!isFaceValidForAdmin(face)) {
+                                        onCaptured(null)
+                                        return@addOnSuccessListener
+                                    }
+
+                                    val cropped = cropFaceForLogin(rotated, face)
+                                    val resized = resizeFaceForLogin(cropped)
+                                    onCaptured(resized)
+                                }
+                                .addOnFailureListener {
+                                    onCaptured(null)
+                                }
+                        } catch (e: Exception) {
+                            onCaptured(null)
+                        } finally {
+                            image.close()
+                        }
+                    }
+                }
+            )
+        }
+
+        try {
+            cameraProvider.unbindAll() // 🔥 KUNCI
+            cameraProvider.bindToLifecycle(
+                lifecycleOwner,
+                CameraSelector.DEFAULT_FRONT_CAMERA,
+                preview,
+                imageCapture
+            )
+            onReady()
+        } catch (e: Exception) {
+            Log.e(TAG_ADMIN_ABSEN, "Camera bind error", e)
+        }
+
+        onDispose {
+            cameraProvider.unbindAll() // 🔥 INI YANG SEBELUMNYA HILANG
+        }
+    }
+
     AndroidView(
         modifier = Modifier.fillMaxSize(),
-        factory = { ctx ->
-            val previewView = PreviewView(ctx)
-
-            ProcessCameraProvider.getInstance(ctx).addListener({
-                val cameraProvider = ProcessCameraProvider.getInstance(ctx).get()
-
-                val preview = androidx.camera.core.Preview.Builder().build().also {
-                    it.setSurfaceProvider(previewView.surfaceProvider)
-                }
-
-                val imageCapture = ImageCapture.Builder().build()
-
-                AdminCameraController.capture = {
-                    imageCapture.takePicture(
-                        executor,
-                        object : ImageCapture.OnImageCapturedCallback() {
-                            override fun onCaptureSuccess(image: ImageProxy) {
-                                try {
-                                    val bmp = imageProxyToBitmap(image)
-                                    val rotated = rotateBitmap(
-                                        bmp,
-                                        image.imageInfo.rotationDegrees.toFloat()
-                                    )
-
-                                    val input = InputImage.fromBitmap(rotated, 0)
-
-                                    AdminFaceAbsenDetector.detector
-                                        .process(input)
-                                        .addOnSuccessListener { faces ->
-                                            if (faces.size != 1) {
-                                                onCaptured(null)
-                                                return@addOnSuccessListener
-                                            }
-
-                                            val face = faces.first()
-                                            if (!isFaceValidForAdmin(face)) {
-                                                onCaptured(null)
-                                                return@addOnSuccessListener
-                                            }
-
-                                            val cropped = cropFaceForLogin(rotated, face)
-                                            val resized = resizeFaceForLogin(cropped)
-                                            onCaptured(resized)
-                                        }
-                                        .addOnFailureListener { e ->
-                                            Log.e(TAG_ADMIN_ABSEN, "Face detection failed", e)
-                                            onCaptured(null)
-                                        }
-                                } catch (e: Exception) {
-                                    Log.e(TAG_ADMIN_ABSEN, "Capture error", e)
-                                    onCaptured(null)
-                                } finally {
-                                    image.close()
-                                }
-                            }
-                        }
-                    )
-                }
-
-                cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_FRONT_CAMERA,
-                    preview,
-                    imageCapture
-                )
-
-                onReady()
-            }, ContextCompat.getMainExecutor(ctx))
-
-            previewView
-        }
+        factory = { previewView }
     )
 }
 

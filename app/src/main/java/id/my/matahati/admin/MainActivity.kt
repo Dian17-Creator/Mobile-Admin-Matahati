@@ -50,7 +50,7 @@ class MainActivity : AppCompatActivity() {
         checkAndRequestLocationPermission()
 
         // ✅ Langsung arahkan ke halaman QR
-        val intent = Intent(this, QrPage::class.java)
+        val intent = Intent(this, AbsensiWajahAdmin::class.java)
         startActivity(intent)
         finish() // agar MainActivity tidak tersisa di backstack
     }
