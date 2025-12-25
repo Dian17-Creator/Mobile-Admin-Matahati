@@ -3,7 +3,6 @@ package id.my.matahati.admin
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.location.Geocoder
 import android.os.Bundle
@@ -12,10 +11,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,16 +21,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -54,6 +46,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -322,100 +315,48 @@ fun QrUi() {
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // 🔘 Tombol Refresh dan Logout
-            val listState = rememberLazyListState()
-
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(125.dp)
-                    .padding(horizontal = 15.dp),
-                shape = RoundedCornerShape(10.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(4.dp)
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center // ✅ KUNCI UTAMA
-                ) {
-                    LazyRow(
-                        state = listState,
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        contentPadding = PaddingValues(horizontal = 5.dp)
-                    ) {
-
-                        item {
-                            ActionCard(
-                                icon = Icons.Default.Refresh,
-                                label = "Refresh",
-                            ) {
-                                scope.launch {
-                                    loading = true
-                                    fetchAndGenerateQR(context) { bitmap, expTime, latitude, longitude, error, token ->
-                                        qrBitmap = bitmap
-                                        expiryTime = expTime
-                                        lat = latitude
-                                        lng = longitude
-                                        errorMessage = error
-                                        loading = false
-                                    }
-                                }
-                            }
-                        }
-
-                        item {
-                            ActionCard(
-                                icon = Icons.Default.Edit,
-                                label = "Manual",
-                            ) {
-                                context.launchWithSlide(AbsenManual::class.java)
-                            }
-                        }
-
-                        item {
-                            ActionCard(
-                                icon = Icons.Default.Event,
-                                label = "Izin",
-                            ) {
-                                context.launchWithSlide(IzinAdmin::class.java)
-                            }
-                        }
-
-                        item {
-                            ActionCard(
-                                icon = Icons.Default.Face,
-                                label = "Face",
-                            ) {
-                                context.launchWithSlide(AbsensiWajahAdmin::class.java)
-                            }
-                        }
-
-                        item {
-                            ActionCard(
-                                icon = Icons.Default.PhoneAndroid,
-                                label = "ID",
-                            ) {
-                                context.launchWithSlide(DeviceInfoAdminActivity::class.java)
-                            }
-                        }
-
-                        item {
-                            ActionCard(
-                                icon = Icons.Default.Logout,
-                                label = "Logout",
-                            ) {
-                                if (session.isRememberMe()) {
-                                    session.clearSession()
-                                } else {
-                                    session.clearLoginButKeepTemp()
-                                }
-                                val intent = Intent(context, LoginPage::class.java)
-                                context.startActivity(intent)
-                                if (context is ComponentActivity) context.finish()
-                            }
+            Button(
+                onClick = {
+                    scope.launch {
+                        loading = true
+                        fetchAndGenerateQR(context) { bitmap, expTime, latitude, longitude, error, token ->
+                            qrBitmap = bitmap
+                            expiryTime = expTime
+                            lat = latitude
+                            lng = longitude
+                            errorMessage = error
+                            loading = false
                         }
                     }
+                },
+                enabled = !loading,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .padding(horizontal = 15.dp),
+                shape = RoundedCornerShape(5.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF4C4C59)
+                )
+            ) {
+                if (loading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(20.dp)
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh",
+                        tint = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Refresh",
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
         }
