@@ -112,8 +112,13 @@ class SessionManager(context: Context) {
         prefs.edit().apply {
             putString(KEY_EMAIL, email)
             putString(KEY_TEMP_PASSWORD, password)
-            putBoolean(KEY_IS_LOGGED_IN, true)
             commit()
         }
     }
+
+    fun logout() {
+        prefs.edit().clear().apply()
+    }
+
+
 }
