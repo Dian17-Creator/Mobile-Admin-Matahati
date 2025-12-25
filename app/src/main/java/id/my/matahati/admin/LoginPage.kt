@@ -63,7 +63,6 @@ import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
-import java.io.IOException
 
 
 // ✅ OkHttpClient Singleton (agar tidak membuat instance berulang)
@@ -82,16 +81,17 @@ class LoginPage : ComponentActivity() {
         val session = SessionManager(applicationContext)
 
         // 🔹 Jika user sudah login dan RememberMe aktif → langsung ke MainActivity
-        if (session.isRememberMe() && session.isLoggedIn()) {
-            val user = session.getUser()
-            val intent = Intent(this, MainActivity::class.java).apply {
-                putExtra("USER_ID", session.getUserId())
-                putExtra("USER_NAME", user["name"]?.toString() ?: "")
-                putExtra("USER_EMAIL", user["email"]?.toString() ?: "")
+        if (session.isRememberMe()) {
+
+            val email = session.getUserEmail()
+            val password = session.getPassword() // 🔑 ambil dari session
+
+            if (!email.isNullOrBlank() && !password.isNullOrBlank()) {
+                autoLogin(this, email, password)
+                return
+            } else {
+                session.logout()
             }
-            startActivity(intent)
-            finish()
-            return
         }
 
         // 🔹 Jika belum login → tampilkan UI
@@ -107,7 +107,8 @@ class LoginPage : ComponentActivity() {
 suspend fun loginUser(
     email: String,
     password: String
-): Triple<Boolean, String, JSONObject?> = withContext(Dispatchers.IO) {
+): Triple<String, String, JSONObject?> = withContext(Dispatchers.IO) {
+
     val client = HttpClientSingleton.client
     val url = "https://absensi.matahati.my.id/login_admin_mobile.php?api=1"
 
@@ -115,6 +116,7 @@ suspend fun loginUser(
         val formBody = FormBody.Builder()
             .add("email", email)
             .add("password", password)
+            .add("device_id", MyApp.DEVICE_ID)
             .build()
 
         val request = Request.Builder()
@@ -124,8 +126,9 @@ suspend fun loginUser(
             .build()
 
         val response = client.newCall(request).execute()
-        val body = response.body?.string() ?: ""
+        val body = response.body?.string() ?: "{}"
         val json = JSONObject(body)
+
         val status = json.optString("status", "error")
         val msg = json.optString("message", "Terjadi kesalahan")
 
@@ -134,20 +137,18 @@ suspend fun loginUser(
                 put("id", json.optInt("admin_id", -1))
                 put("name", json.optString("admin_name", ""))
                 put("email", json.optString("email", ""))
-                put("password", password)
-                put("department", json.optString("mdepartment", ""))
+                put("department", json.optString("cdeptname", ""))
                 put("fadmin", json.optInt("fadmin", 0))
                 put("fsuper", json.optInt("fsuper", 0))
                 put("fhrd", json.optInt("fhrd", 0))
             }
-            Triple(true, msg, user)
+            Triple("ok", msg, user)
         } else {
-            Triple(false, msg, null)
+            Triple(status, msg, null)
         }
-    } catch (e: IOException) {
-        Triple(false, "Network error: ${e.message}", null)
+
     } catch (e: Exception) {
-        Triple(false, "Error: ${e.message}", null)
+        Triple("error", e.message ?: "Network error", null)
     }
 }
 
@@ -359,49 +360,88 @@ fun handleLogin(
     isLoadingSetter(true)
 
     context.lifecycleScope.launchWhenResumed {
-        val (success, msg, userJson) = loginUser(email, password)
+
+        val (status, msg, userJson) = loginUser(email, password)
         isLoadingSetter(false)
-        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
 
-        if (success && userJson != null) {
-            val userId = userJson.optInt("id", -1)
-            val userName = userJson.optString("name", "")
-            val userEmail = userJson.optString("email", "")
+        when (status) {
 
-            val session = SessionManager(context.applicationContext)
-            session.saveTempPassword(password)
+            "ok" -> {
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
 
-            val userDepartment = userJson.optString("department", "")
-            val fadmin = userJson.optInt("fadmin", 0)
-            val fsuper = userJson.optInt("fsuper", 0)
-            val fhrd = userJson.optInt("fhrd", 0)
+                val userId = userJson!!.optInt("id")
+                val userName = userJson.optString("name")
+                val userEmail = userJson.optString("email")
 
-            if (rememberMe) {
-                session.saveUser(
-                    userId,
-                    userName,
-                    userEmail,
-                    password,
-                    userDepartment,
-                    fadmin,
-                    fsuper,
-                    fhrd
+                val session = SessionManager(context)
+                session.saveTempPassword(password)
+
+                val dept = userJson.optString("department")
+                val fadmin = userJson.optInt("fadmin")
+                val fsuper = userJson.optInt("fsuper")
+                val fhrd = userJson.optInt("fhrd")
+
+                if (rememberMe) {
+                    session.saveUser(
+                        userId,
+                        userName,
+                        userEmail,
+                        password,
+                        dept,
+                        fadmin,
+                        fsuper,
+                        fhrd
+                    )
+                    session.setRememberMe(true)
+                } else {
+                    session.saveTempUser(userEmail, password)
+                    session.setRememberMe(false)
+                }
+
+                context.startActivity(
+                    Intent(context, MainActivity::class.java)
                 )
-                session.setRememberMe(true)
-                session.clearTempPassword()
-            } else {
-                session.saveTempUser(userEmail, password)
-                session.setRememberMe(false)
+                context.finish()
             }
 
-
-            val intent = Intent(context, MainActivity::class.java).apply {
-                putExtra("USER_ID", userId)
-                putExtra("USER_NAME", userName)
-                putExtra("USER_EMAIL", userEmail)
+            "pending" -> {
+                Toast.makeText(
+                    context,
+                    "Device menunggu persetujuan HRD",
+                    Toast.LENGTH_LONG
+                ).show()
             }
-            context.startActivity(intent)
-            context.finish()
+
+            "rejected" -> {
+                Toast.makeText(
+                    context,
+                    "Device ditolak. Hubungi HRD.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+
+            else -> {
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            }
         }
     }
 }
+
+private fun autoLogin(
+    context: ComponentActivity,
+    email: String,
+    password: String
+) {
+    context.lifecycleScope.launchWhenResumed {
+        val (status, msg, _) = loginUser(email, password)
+
+        if (status == "ok") {
+            context.startActivity(Intent(context, MainActivity::class.java))
+            context.finish()
+        } else {
+            SessionManager(context).logout()
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+        }
+    }
+}
+

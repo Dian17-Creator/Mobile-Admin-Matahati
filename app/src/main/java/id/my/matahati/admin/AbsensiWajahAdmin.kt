@@ -33,7 +33,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Edit
@@ -77,6 +79,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.google.android.gms.location.LocationServices
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
@@ -96,7 +100,6 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-
 
 private const val TAG_ADMIN_ABSEN = "ADMIN_FACE_ABSEN"
 private const val ADMIN_FACE_ABSEN_URL = "https://absensi.matahati.my.id/admin_face_scan_mobile.php"
@@ -158,6 +161,7 @@ fun AdminFaceAbsensiScreen() {
 
     val primaryColor = Color(0xFFB63352)
     var showSuccessDialog by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -183,6 +187,32 @@ fun AdminFaceAbsensiScreen() {
     var remainingSeconds by remember { mutableStateOf(0) }
     var isTimerRunning by remember { mutableStateOf(false) }
 
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    if (isTimerRunning && remainingSeconds > 0) {
+                        cameraEnabled = true
+                        locationEnabled = true
+                    }
+                }
+
+                Lifecycle.Event.ON_PAUSE -> {
+                    cameraEnabled = false
+                }
+
+                else -> {}
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     LaunchedEffect(Unit) {
         // default aktif saat halaman dibuka
         cameraEnabled = true
@@ -203,6 +233,7 @@ fun AdminFaceAbsensiScreen() {
         cameraEnabled = false
         locationEnabled = false
         isTimerRunning = false
+        isCameraReady = false
     }
 
     LaunchedEffect(locationEnabled) {
@@ -236,7 +267,10 @@ fun AdminFaceAbsensiScreen() {
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(20.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp)
+            .verticalScroll(scrollState),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
@@ -246,6 +280,7 @@ fun AdminFaceAbsensiScreen() {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp),
+
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -310,7 +345,7 @@ fun AdminFaceAbsensiScreen() {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(355.dp)
+                .height(350.dp)
                 .clip(RoundedCornerShape(10.dp)),
             contentAlignment = Alignment.Center
         ) {
@@ -489,7 +524,7 @@ fun AdminFaceAbsensiScreen() {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.4f) // 🔹 Sesuaikan weight
+                .padding(vertical = 5.dp)
                 .padding(horizontal = 0.dp, vertical = 5.dp), // 🔹 Kurangi padding
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
