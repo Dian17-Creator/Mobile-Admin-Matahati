@@ -25,9 +25,10 @@ fun enqueueManualSyncWorker(context: Context) {
 
     WorkManager.getInstance(context).enqueueUniqueWork(
         "sync_manual_absen",
-        ExistingWorkPolicy.KEEP,
+        ExistingWorkPolicy.REPLACE, // 🔥 WAJIB
         workRequest
     )
+
 
     Log.d("ManualWorkerHelper", "✅ Worker sinkronisasi absen manual dijadwalkan.")
 }

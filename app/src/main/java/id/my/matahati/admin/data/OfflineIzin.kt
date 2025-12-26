@@ -7,8 +7,10 @@ import androidx.room.PrimaryKey
 data class OfflineIzin(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val userId: Int,
+    val adminId : Int,
     val date: String,
-    val coordinate: String,
+    val lat: String,
+    val lng: String,
     val placeName: String,
     val category: String,
     val reason: String,

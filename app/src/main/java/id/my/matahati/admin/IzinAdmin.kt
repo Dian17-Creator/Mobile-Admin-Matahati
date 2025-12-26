@@ -2,6 +2,7 @@ package id.my.matahati.admin
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -63,8 +64,13 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import androidx.work.CoroutineWorker
+import androidx.work.WorkerParameters
 import coil.compose.rememberAsyncImagePainter
 import com.google.android.gms.location.LocationServices
+import id.my.matahati.absensi.utils.NetworkUtils
+import id.my.matahati.admin.data.OfflineIzin
+import id.my.matahati.admin.worker.enqueueIzinSyncWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -423,8 +429,50 @@ fun IzinAdminScreen() {
                                 Toast.makeText(context, "Lengkapi semua data!", Toast.LENGTH_SHORT).show()
                             } else {
                                 scope.launch {
+
+                                    // validasi dulu
+                                    if (selectedUserId == null || alasan.isBlank() || photoBase64.isBlank()) {
+                                        Toast.makeText(context, "Lengkapi semua data!", Toast.LENGTH_SHORT).show()
+                                        return@launch
+                                    }
+
                                     loading = true
 
+                                    // =========================
+                                    // 🔌 OFFLINE MODE
+                                    // =========================
+                                    if (!NetworkUtils.isOnline(context)) {
+
+                                        val offlineData = OfflineIzin(
+                                            userId = selectedUserId!!,
+                                            adminId = session.getUserId(),
+                                            date = LocalDate.now().toString(),
+                                            lat = lat.toString(),          // 🔥 WAJIB
+                                            lng = lng.toString(),          // 🔥 WAJIB
+                                            placeName = placeName,
+                                            category = category.value,
+                                            reason = alasan,
+                                            photoBase64 = photoBase64
+                                        )
+
+                                        MyApp.db.offlineIzinDao().insert(offlineData)
+
+                                        enqueueIzinSyncWorker(context)
+
+                                        loading = false
+
+                                        Toast.makeText(
+                                            context,
+                                            "📡 Izin disimpan offline. Akan dikirim otomatis saat online.",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+
+                                        return@launch
+                                    }
+
+                                    // =========================
+                                    // 🌐 ONLINE MODE
+                                    // =========================
                                     val result = submitIzinAdminWithPhoto(
                                         userId = selectedUserId!!,
                                         alasan = alasan,
@@ -441,9 +489,8 @@ fun IzinAdminScreen() {
                                     Toast.makeText(context, result, Toast.LENGTH_LONG).show()
 
                                     if (result.startsWith("✅")) {
-                                        val i = Intent(context, MainActivity::class.java)
-                                        context.startActivity(i)
-                                        if (context is Activity) context.finish()
+                                        context.startActivity(Intent(context, MainActivity::class.java))
+                                        (context as? Activity)?.finish()
                                     }
                                 }
                             }
@@ -524,3 +571,55 @@ suspend fun submitIzinAdminWithPhoto(
         "⚠️ Error jaringan: ${e.message}"
     }
 }
+
+class SyncIzinAdminWorker(
+    context: Context,
+    params: WorkerParameters
+) : CoroutineWorker(context, params) {
+
+    override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+        try {
+            val dao = MyApp.db.offlineIzinDao()
+            val list = dao.getAll()
+            if (list.isEmpty()) return@withContext Result.success()
+
+            val client = OkHttpClient()
+
+            for (izin in list) {
+                val json = JSONObject().apply {
+                    put("userId", izin.userId)
+                    put("adminId", izin.adminId)
+                    put("requestDate", izin.date)
+                    put("location", "${izin.lat},${izin.lng}")
+                    put("placeName", izin.placeName)
+                    put("category", izin.category)
+                    put("reason", izin.reason)
+                    put("photoBase64", izin.photoBase64)
+                }
+
+                val request = Request.Builder()
+                    .url("https://absensi.matahati.my.id/izin_admin.php")
+                    .post(json.toString().toRequestBody("application/json".toMediaType()))
+                    .addHeader("Accept", "application/json")
+                    .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID)
+                    .build()
+
+                val response = client.newCall(request).execute()
+                if (response.isSuccessful) {
+                    dao.deleteById(izin.id)
+                }
+            }
+
+            // broadcast ke UI
+            applicationContext.sendBroadcast(
+                Intent("SYNC_IZIN_ADMIN_SUCCESS")
+            )
+
+            Result.success()
+
+        } catch (e: Exception) {
+            Result.retry()
+        }
+    }
+}
+
