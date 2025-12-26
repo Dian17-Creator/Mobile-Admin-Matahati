@@ -77,6 +77,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import id.my.matahati.absensi.utils.NetworkUtils
+import id.my.matahati.admin.data.OfflineManualAbsen
+import id.my.matahati.admin.worker.enqueueManualSyncWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -108,6 +111,11 @@ class AbsenManual : ComponentActivity() {
 fun AbsenManualScreen() {
     val context = LocalContext.current
     val session = remember { SessionManager(context) }
+
+    LaunchedEffect(Unit) {
+        ensureToken(context)
+    }
+
     val scope = rememberCoroutineScope()
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
 
@@ -416,8 +424,52 @@ suspend fun handleAbsenManual(
         return
     }
 
+    // =========================
+    // 🔌 OFFLINE MODE (BARU)
+    // =========================
+    if (!NetworkUtils.isOnline(context)) {
+
+        val placeName = "${lat},${lng}"
+
+        val offlineData = OfflineManualAbsen(
+            userEmail = userEmail,
+            userPassword = userPassword,
+            reason = reason,
+            lat = lat.toString(),
+            lng = lng.toString(),
+            placeName = placeName,
+            photoBase64 = photoBase64 ?: "",
+            createdAt = System.currentTimeMillis()
+        )
+
+        MyApp.db.offlineManualAbsenDao().insert(offlineData)
+
+        enqueueManualSyncWorker(context)
+
+        Toast.makeText(
+            context,
+            "📡 Absen manual disimpan offline. Akan dikirim otomatis saat online.",
+            Toast.LENGTH_LONG
+        ).show()
+
+        return
+    }
+
+    // =========================
+    // 🌐 ONLINE MODE (LOGIC LAMA – TIDAK DIUBAH)
+    // =========================
     isLoadingSetter(true)
-    val result = sendManualCheckin(adminEmail, adminPassword, userEmail, userPassword, reason, lat, lng, photoBase64)
+    val result = sendManualCheckin(
+        adminEmail,
+        adminPassword,
+        userEmail,
+        userPassword,
+        reason,
+        lat,
+        lng,
+        photoBase64
+    )
+
     withContext(Dispatchers.Main) {
         isLoadingSetter(false)
         Toast.makeText(context, result, Toast.LENGTH_LONG).show()
@@ -485,3 +537,30 @@ suspend fun FusedLocationProviderClient.awaitLocation(context: Context): Locatio
             cont.resume(null)
         }
     }
+
+suspend fun ensureToken(context: Context) {
+    try {
+        val session = SessionManager(context)
+        val adminEmail = session.getUser()["email"] as? String ?: return
+        val adminPassword = session.getPassword() ?: session.getTempPassword() ?: return
+
+        val json = JSONObject().apply {
+            put("admin_email", adminEmail)
+            put("admin_password", adminPassword)
+        }
+
+        val body = json.toString()
+            .toRequestBody("application/json".toMediaType())
+
+        val request = Request.Builder()
+            .url("https://absensi.matahati.my.id/ensure_token.php")
+            .post(body)
+            .addHeader("Accept", "application/json")
+            .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID)
+            .build()
+
+        OkHttpClient().newCall(request).execute()
+    } catch (e: Exception) {
+        // sengaja diabaikan → fire & forget
+    }
+}
