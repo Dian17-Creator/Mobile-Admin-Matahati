@@ -12,7 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         OfflineManualAbsen::class,
         OfflineIzin::class,
     ],
-    version = 10, // ⬆️ pastikan versi naik setiap menambah entity baru
+    version = 11, // ⬆️ pastikan versi naik setiap menambah entity baru
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

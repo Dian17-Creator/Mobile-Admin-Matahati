@@ -1,12 +1,15 @@
 package id.my.matahati.admin.worker
 
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import android.widget.Toast
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import id.my.matahati.admin.MyApp
 import id.my.matahati.admin.SessionManager
+import id.my.matahati.admin.ensureToken
+import id.my.matahati.admin.utils.showSuccessNotification
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -17,74 +20,99 @@ import org.json.JSONObject
 
 class SyncManualWorker(
     context: Context,
-    workerParams: WorkerParameters
-) : CoroutineWorker(context, workerParams) {
+    params: WorkerParameters
+) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         try {
             val dao = MyApp.db.offlineManualAbsenDao()
-            val dataList = dao.getAll()
+            val list = dao.getAll()
 
-            if (dataList.isEmpty()) {
-                Log.d("SyncManualWorker", "✅ Tidak ada data offline admin")
+            if (list.isEmpty()) {
+                Log.d("SyncManualWorker", "📭 Tidak ada data offline")
                 return@withContext Result.success()
             }
 
+            // 🔐 pastikan token ada (tidak peduli hasilnya dulu)
+            ensureToken(applicationContext)
+
             val session = SessionManager(applicationContext)
-            val adminEmail = session.getUser()["email"] as? String ?: ""
-            val adminPassword = session.getPassword() ?: session.getTempPassword() ?: ""
+            val adminEmail = session.getUser()["email"] as? String
+                ?: return@withContext Result.retry()
+
+            val adminPassword =
+                session.getPassword() ?: session.getTempPassword()
+                ?: return@withContext Result.retry()
 
             val client = OkHttpClient()
+            var hasFailure = false
 
-            for (absen in dataList) {
+            for (absen in list) {
+                try {
+                    val json = JSONObject().apply {
+                        put("admin_email", adminEmail)
+                        put("admin_password", adminPassword)
+                        put("user_email", absen.userEmail)
+                        put("user_password", absen.userPassword)
+                        put("reason", absen.reason)
+                        put("lat", absen.lat)
+                        put("lng", absen.lng)
+                        put("photoBase64", absen.photoBase64)
+                    }
 
-                val json = JSONObject().apply {
-                    put("admin_email", adminEmail)
-                    put("admin_password", adminPassword)
-                    put("user_email", absen.userEmail)
-                    put("user_password", absen.userPassword)
-                    put("reason", absen.reason)
-                    put("lat", absen.lat)
-                    put("lng", absen.lng)
-                    put("photoBase64", absen.photoBase64)
-                }
+                    val request = Request.Builder()
+                        .url("https://absensi.matahati.my.id/manual_checkin.php")
+                        .post(json.toString().toRequestBody("application/json".toMediaType()))
+                        .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID)
+                        .build()
 
-                val request = Request.Builder()
-                    .url("https://absensi.matahati.my.id/manual_checkin.php")
-                    .post(json.toString().toRequestBody("application/json".toMediaType()))
-                    .addHeader("Accept", "application/json")
-                    .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID)
-                    .build()
+                    val response = client.newCall(request).execute()
+                    val body = response.body?.string().orEmpty()
 
-                val response = client.newCall(request).execute()
-                val body = response.body?.string() ?: ""
+                    val success =
+                        response.isSuccessful && body.contains("\"status\":\"ok\"")
 
-                Log.d("SyncManualWorker", "Response: $body")
+                    if (success) {
+                        dao.delete(absen) // ✅ hapus HANYA jika sukses
+                        Log.d("SyncManualWorker", "✅ Terkirim id=${absen.id}")
+                    } else {
+                        hasFailure = true
+                        Log.e("SyncManualWorker", "❌ Gagal id=${absen.id} $body")
+                    }
 
-                if (response.isSuccessful && body.contains("\"status\":\"ok\"")) {
-                    dao.delete(absen)
-                    Log.d("SyncManualWorker", "🗑️ Data offline dihapus")
-                } else {
-                    Log.e("SyncManualWorker", "❌ Gagal sync: $body")
+                } catch (e: Exception) {
+                    hasFailure = true
+                    Log.e("SyncManualWorker", "⚠️ Exception per item", e)
                 }
             }
 
-            withContext(Dispatchers.Main) {
-                Toast.makeText(
-                    applicationContext,
-                    "📤 Absen manual offline berhasil disinkronkan",
-                    Toast.LENGTH_LONG
-                ).show()
+            // =========================
+            // 📢 UI FEEDBACK (MAIN THREAD)
+            // =========================
+            if (!hasFailure) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        applicationContext,
+                        "✅ Koneksi kembali. Absen manual berhasil dikirim.",
+                        Toast.LENGTH_LONG
+                    ).show()
 
-                applicationContext.sendBroadcast(
-                    android.content.Intent("SYNC_MANUAL_ABSEN_SUCCESS")
-                )
+                    // 🛰️ Broadcast ke Activity (kalau masih terbuka)
+                    applicationContext.sendBroadcast(
+                        Intent("SYNC_MANUAL_ABSEN_SUCCESS")
+                    )
+                }
+
+                // 🔔 Notifikasi sistem (aman walau app di background)
+                showSuccessNotification(applicationContext)
+
+                return@withContext Result.success()
             }
 
-            Result.success()
+            Result.retry()
 
         } catch (e: Exception) {
-            Log.e("SyncManualWorker", "❌ Error sync manual admin", e)
+            Log.e("SyncManualWorker", "❌ Fatal error", e)
             Result.retry()
         }
     }

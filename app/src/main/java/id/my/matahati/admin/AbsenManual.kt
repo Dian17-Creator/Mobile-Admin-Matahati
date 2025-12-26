@@ -47,6 +47,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -111,6 +112,39 @@ class AbsenManual : ComponentActivity() {
 fun AbsenManualScreen() {
     val context = LocalContext.current
     val session = remember { SessionManager(context) }
+    val activity = context as ComponentActivity
+
+    // ✅ LISTEN BROADCAST DARI WORKER
+    DisposableEffect(Unit) {
+
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: android.content.Intent?) {
+                Toast.makeText(
+                    context,
+                    "✅ Koneksi kembali. Absen manual berhasil dikirim.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+
+        val filter = android.content.IntentFilter("MANUAL_ABSEN_SYNC_SUCCESS")
+
+        // ✅ Android 13+ SAFE
+        androidx.core.content.ContextCompat.registerReceiver(
+            context,
+            receiver,
+            filter,
+            android.content.Context.RECEIVER_NOT_EXPORTED
+        )
+
+        onDispose {
+            try {
+                context.unregisterReceiver(receiver)
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         ensureToken(context)
@@ -538,29 +572,30 @@ suspend fun FusedLocationProviderClient.awaitLocation(context: Context): Locatio
         }
     }
 
-suspend fun ensureToken(context: Context) {
+suspend fun ensureToken(context: Context): Boolean = withContext(Dispatchers.IO) {
     try {
         val session = SessionManager(context)
-        val adminEmail = session.getUser()["email"] as? String ?: return
-        val adminPassword = session.getPassword() ?: session.getTempPassword() ?: return
+        val adminEmail = session.getUser()["email"] as? String ?: return@withContext false
+        val adminPassword = session.getPassword() ?: session.getTempPassword() ?: return@withContext false
 
         val json = JSONObject().apply {
             put("admin_email", adminEmail)
             put("admin_password", adminPassword)
         }
 
-        val body = json.toString()
-            .toRequestBody("application/json".toMediaType())
-
         val request = Request.Builder()
             .url("https://absensi.matahati.my.id/ensure_token.php")
-            .post(body)
-            .addHeader("Accept", "application/json")
+            .post(json.toString().toRequestBody("application/json".toMediaType()))
             .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID)
             .build()
 
-        OkHttpClient().newCall(request).execute()
+        val response = OkHttpClient().newCall(request).execute()
+        val body = response.body?.string().orEmpty()
+
+        response.isSuccessful && body.contains("\"status\":\"ok\"")
+
     } catch (e: Exception) {
-        // sengaja diabaikan → fire & forget
+        false
     }
 }
+
