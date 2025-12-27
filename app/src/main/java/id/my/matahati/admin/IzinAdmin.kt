@@ -421,7 +421,7 @@ fun IzinAdminScreen() {
                         )
                     }
 
-                    Spacer(modifier = Modifier.height((16.dp * scaleFactor)))
+                    // Spacer(modifier = Modifier.height((16.dp * scaleFactor)))
 
                     Button(
                         onClick = {
