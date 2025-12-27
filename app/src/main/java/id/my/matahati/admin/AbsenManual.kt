@@ -93,6 +93,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import kotlin.coroutines.resume
+import android.location.Geocoder
+import java.util.Locale
 
 object LocationCache {
     var lat: Double? = null
@@ -463,7 +465,8 @@ suspend fun handleAbsenManual(
     // =========================
     if (!NetworkUtils.isOnline(context)) {
 
-        val placeName = "${lat},${lng}"
+        val placeName = getPlaceName(context, lat, lng)
+            ?: "${lat},${lng}"
 
         val offlineData = OfflineManualAbsen(
             userEmail = userEmail,
@@ -493,6 +496,11 @@ suspend fun handleAbsenManual(
     // 🌐 ONLINE MODE (LOGIC LAMA – TIDAK DIUBAH)
     // =========================
     isLoadingSetter(true)
+
+    // 🔹 Ambil nama lokasi (reverse geocode)
+    val placeName = getPlaceName(context, lat, lng)
+        ?: "${lat},${lng}" // fallback aman
+
     val result = sendManualCheckin(
         adminEmail,
         adminPassword,
@@ -501,6 +509,7 @@ suspend fun handleAbsenManual(
         reason,
         lat,
         lng,
+        placeName,
         photoBase64
     )
 
@@ -523,6 +532,7 @@ suspend fun sendManualCheckin(
     reason: String,
     lat: Double,
     lng: Double,
+    placeName: String?,
     photoBase64: String?
 ): String = withContext(Dispatchers.IO) {
     try {
@@ -535,6 +545,9 @@ suspend fun sendManualCheckin(
             put("reason", reason)
             put("lat", lat)
             put("lng", lng)
+            if (!placeName.isNullOrBlank()) {
+                put("cplacename", placeName)
+            }
             if (!photoBase64.isNullOrBlank()) put("photoBase64", photoBase64)
         }
         val client = OkHttpClient()
@@ -599,3 +612,27 @@ suspend fun ensureToken(context: Context): Boolean = withContext(Dispatchers.IO)
     }
 }
 
+suspend fun getPlaceName(
+    context: Context,
+    lat: Double,
+    lng: Double
+): String? = withContext(Dispatchers.IO) {
+    try {
+        val geocoder = Geocoder(context, Locale("id", "ID"))
+        val addresses = geocoder.getFromLocation(lat, lng, 1)
+
+        if (!addresses.isNullOrEmpty()) {
+            val addr = addresses[0]
+
+            listOfNotNull(
+                addr.subLocality,      // desa / kelurahan
+                addr.locality,         // kecamatan / kota
+                addr.subAdminArea,     // kabupaten
+                addr.adminArea         // provinsi
+            ).joinToString(", ")
+        } else null
+
+    } catch (e: Exception) {
+        null
+    }
+}

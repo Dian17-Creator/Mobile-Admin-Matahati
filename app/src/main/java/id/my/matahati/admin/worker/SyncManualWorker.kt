@@ -57,7 +57,15 @@ class SyncManualWorker(
                         put("reason", absen.reason)
                         put("lat", absen.lat)
                         put("lng", absen.lng)
-                        put("photoBase64", absen.photoBase64)
+
+                        // 🔥 INI YANG HILANG
+                        if (absen.placeName.isNotBlank()) {
+                            put("cplacename", absen.placeName)
+                        }
+
+                        if (absen.photoBase64.isNotBlank()) {
+                            put("photoBase64", absen.photoBase64)
+                        }
                     }
 
                     val request = Request.Builder()
