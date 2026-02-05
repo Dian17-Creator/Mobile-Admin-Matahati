@@ -14,13 +14,12 @@ import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
@@ -72,33 +71,16 @@ fun isFaceValidForAdmin(face: Face): Boolean {
     return true
 }
 
-enum class LivenessStep {
-    BLINK,
-    HEAD_NOD,
-    TURN_RIGHT,
-    TURN_LEFT,
-    SMILE
-}
-
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun AdminFaceAbsensiCamera(
     onReady: () -> Unit,
-    currentStepIndex: Int,
-    onFaceFrame: (Face, Int) -> Unit,
+    onFaceFrame: (Face) -> Unit,
     onCaptured: (Bitmap?) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val executor = remember { Executors.newSingleThreadExecutor() }
-
-    // 🔥 WAJIB ADA
-    val stepIndexState = remember { mutableStateOf(currentStepIndex) }
-
-    LaunchedEffect(currentStepIndex) {
-        Log.d("ADMIN_CAMERA", "📍 Step changed ${stepIndexState.value} → $currentStepIndex")
-        stepIndexState.value = currentStepIndex
-    }
 
     val previewView = remember {
         PreviewView(context).apply {
@@ -107,90 +89,110 @@ fun AdminFaceAbsensiCamera(
     }
 
     DisposableEffect(lifecycleOwner) {
-        val cameraProvider = ProcessCameraProvider.getInstance(context).get()
 
-        val preview = androidx.camera.core.Preview.Builder().build().apply {
-            setSurfaceProvider(previewView.surfaceProvider)
-        }
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
-        val imageCapture = ImageCapture.Builder().build()
+        cameraProviderFuture.addListener({
 
-        val imageAnalysis = ImageAnalysis.Builder()
-            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-            .build()
+            val cameraProvider = cameraProviderFuture.get()
 
-        imageAnalysis.setAnalyzer(executor) { imageProxy ->
-            val media = imageProxy.image ?: return@setAnalyzer imageProxy.close()
+            val preview = androidx.camera.core.Preview.Builder().build().apply {
+                setSurfaceProvider(previewView.surfaceProvider)
+            }
 
-            val img = InputImage.fromMediaImage(
-                media,
-                imageProxy.imageInfo.rotationDegrees
-            )
+            val imageCapture = ImageCapture.Builder().build()
 
-            AdminFaceAbsenDetector.detector
-                .process(img)
-                .addOnSuccessListener { faces ->
-                    if (faces.size == 1) {
-                        val face = faces.first()
-                        Handler(Looper.getMainLooper()).post {
-                            val stepIndex = stepIndexState.value
-                            onFaceFrame(face, stepIndex)
+            val imageAnalysis = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+
+            // =========================
+            // FACE ANALYZER
+            // =========================
+            imageAnalysis.setAnalyzer(executor) { imageProxy ->
+
+                val media = imageProxy.image ?: run {
+                    imageProxy.close()
+                    return@setAnalyzer
+                }
+
+                val img = InputImage.fromMediaImage(
+                    media,
+                    imageProxy.imageInfo.rotationDegrees
+                )
+
+                AdminFaceAbsenDetector.detector
+                    .process(img)
+                    .addOnSuccessListener { faces ->
+                        if (faces.size == 1) {
+                            val face = faces.first()
+                            Handler(Looper.getMainLooper()).post {
+                                onFaceFrame(face)
+                            }
                         }
+                        imageProxy.close()
                     }
-                    imageProxy.close()
-                }
-                .addOnFailureListener {
-                    imageProxy.close()
-                }
-        }
+                    .addOnFailureListener {
+                        imageProxy.close()
+                    }
+            }
 
-        AdminCameraController.capture = {
-            imageCapture.takePicture(
-                executor,
-                object : ImageCapture.OnImageCapturedCallback() {
-                    override fun onCaptureSuccess(image: ImageProxy) {
-                        try {
-                            val bmp = imageProxyToBitmap(image)
-                            val rotated = rotateBitmap(
-                                bmp,
-                                image.imageInfo.rotationDegrees.toFloat()
-                            )
+            // =========================
+            // CAPTURE LOGIC (WAJIB ADA)
+            // =========================
+            AdminCameraController.capture = {
+                imageCapture.takePicture(
+                    executor,
+                    object : ImageCapture.OnImageCapturedCallback() {
 
-                            val input = InputImage.fromBitmap(rotated, 0)
+                        override fun onCaptureSuccess(image: ImageProxy) {
+                            try {
+                                val bmp = imageProxyToBitmap(image)
+                                val rotated = rotateBitmap(
+                                    bmp,
+                                    image.imageInfo.rotationDegrees.toFloat()
+                                )
 
-                            AdminFaceAbsenDetector.detector
-                                .process(input)
-                                .addOnSuccessListener { faces ->
-                                    if (faces.size != 1) {
+                                val input = InputImage.fromBitmap(rotated, 0)
+
+                                AdminFaceAbsenDetector.detector
+                                    .process(input)
+                                    .addOnSuccessListener { faces ->
+                                        if (faces.size != 1) {
+                                            onCaptured(null)
+                                            return@addOnSuccessListener
+                                        }
+
+                                        val face = faces.first()
+                                        if (!isFaceValidForAdmin(face)) {
+                                            onCaptured(null)
+                                            return@addOnSuccessListener
+                                        }
+
+                                        val cropped = cropFaceForLogin(rotated, face)
+                                        val resized = resizeFaceForLogin(cropped)
+
+                                        onCaptured(resized)
+                                    }
+                                    .addOnFailureListener {
                                         onCaptured(null)
-                                        return@addOnSuccessListener
                                     }
 
-                                    val face = faces.first()
-                                    if (!isFaceValidForAdmin(face)) {
-                                        onCaptured(null)
-                                        return@addOnSuccessListener
-                                    }
-
-                                    val cropped = cropFaceForLogin(rotated, face)
-                                    val resized = resizeFaceForLogin(cropped)
-                                    onCaptured(resized)
-                                }
-                                .addOnFailureListener {
-                                    onCaptured(null)
-                                }
-                        } catch (e: Exception) {
-                            onCaptured(null)
-                        } finally {
-                            image.close()
+                            } catch (e: Exception) {
+                                onCaptured(null)
+                            } finally {
+                                image.close()
+                            }
                         }
                     }
-                }
-            )
-        }
+                )
+            }
 
-        try {
-            cameraProvider.unbindAll() // 🔥 KUNCI
+            // =========================
+            // BIND CAMERA
+            // =========================
+            cameraProvider.unbindAll()
+
             cameraProvider.bindToLifecycle(
                 lifecycleOwner,
                 CameraSelector.DEFAULT_FRONT_CAMERA,
@@ -198,13 +200,14 @@ fun AdminFaceAbsensiCamera(
                 imageCapture,
                 imageAnalysis
             )
+
             onReady()
-        } catch (e: Exception) {
-            Log.e(TAG_ADMIN_ABSEN, "Camera bind error", e)
-        }
+
+        }, ContextCompat.getMainExecutor(context))
+
 
         onDispose {
-            cameraProvider.unbindAll() // 🔥 INI YANG SEBELUMNYA HILANG
+            executor.shutdown()
         }
     }
 
@@ -213,6 +216,7 @@ fun AdminFaceAbsensiCamera(
         factory = { previewView }
     )
 }
+
 
 data class AdminFaceResponse(
     val success: Boolean,
