@@ -2,18 +2,10 @@ package id.my.matahati.admin
 
 import android.app.Activity
 import android.content.Intent
-import android.util.Log
 import androidx.activity.ComponentActivity
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.with
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -56,7 +48,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -74,78 +65,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import com.google.android.gms.location.LocationServices
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminFaceAbsensiScreen() {
 
-    // liveness
-    var smileDone by remember { mutableStateOf(false) }
-    var smilingFrame by remember { mutableStateOf(0) }
-    var isSessionStarted by remember { mutableStateOf(false) }
-    var eyesClosed by remember { mutableStateOf(false) }
-    var blinkDone by remember { mutableStateOf(false) }
-    var headUpDone by remember { mutableStateOf(false) }
-    var headNodDone by remember { mutableStateOf(false) }
-
-    var headUpFrame by remember { mutableStateOf(0) }
-    var headDownFrame by remember { mutableStateOf(0) }
-    var turnRightDone by remember { mutableStateOf(false) }
-    var turnLeftDone by remember { mutableStateOf(false) }
-
-    var turnFrame by remember { mutableStateOf(0) }
-    var remainingTime by remember { mutableStateOf(0) }
-    var isTransitioningStep by remember { mutableStateOf(false) }
-    val STEP_TIMEOUT_MS = 3_000L
-
-    val STEP_TRANSITION_DELAY_MS = 300L
-    var stepStartTime by remember { mutableStateOf(0L) }
-    var livenessSteps by remember { mutableStateOf<List<LivenessStep>>(emptyList()) }
-
-    var currentLivenessIndex by remember { mutableStateOf(0) }
-    val currentLivenessStep = livenessSteps.getOrNull(currentLivenessIndex)
-
-    val livenessPassed = currentLivenessIndex >= livenessSteps.size
-    val isDoingLiveness = isSessionStarted && !livenessPassed
-    val scope = rememberCoroutineScope()
-
-    fun resetLiveness(autoRestart: Boolean = true) {
-        Log.w(TAG_ADMIN_ABSEN, "🔄 RESET LIVENESS")
-
-        blinkDone = false
-        eyesClosed = false
-        headUpDone = false
-        headNodDone = false
-        headUpFrame = 0
-        headDownFrame = 0
-        turnRightDone = false
-        turnLeftDone = false
-        turnFrame = 0
-        smileDone = false
-        smilingFrame = 0
-
-        isTransitioningStep = false
-        currentLivenessIndex = 0
-        stepStartTime = System.currentTimeMillis()
-
-        if (autoRestart) {
-            livenessSteps = LivenessStep.values()
-                .toList()
-                .shuffled()
-                .take(2)
-            isSessionStarted = true
-        }
-    }
-
     val primaryColor = Color(0xFFB63352)
     var showSuccessDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     val session = remember { SessionManager(context) }
     val adminId = session.getUserId()
     var isCameraReady by remember { mutableStateOf(false) }
@@ -163,83 +95,11 @@ fun AdminFaceAbsensiScreen() {
     var isTimerRunning by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    LaunchedEffect(livenessPassed) {
-        if (
-            isSessionStarted &&
-            livenessPassed &&
-            isCameraReady &&
-            !isCapturing &&
-            !isUploading
-        ) {
-            delay(300)
-            isCapturing = true
-            AdminCameraController.capture()
-        }
-    }
-
-    LaunchedEffect(currentLivenessIndex) {
-        if (isSessionStarted && !livenessPassed) {
-            stepStartTime = System.currentTimeMillis()
-            Log.d(TAG_ADMIN_ABSEN, "⏱ Step $currentLivenessIndex started")
-        }
-    }
-
-    LaunchedEffect(stepStartTime, isSessionStarted) {
-        if (!isSessionStarted || stepStartTime == 0L) return@LaunchedEffect
-
-        val timeoutSec = (STEP_TIMEOUT_MS / 1000).toInt()
-
-        while (isSessionStarted && stepStartTime > 0) {
-            val elapsed = ((System.currentTimeMillis() - stepStartTime) / 1000).toInt()
-            remainingTime = (timeoutSec - elapsed).coerceAtLeast(0)
-            delay(200)
-        }
-    }
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> {
-                    if (isTimerRunning && remainingSeconds > 0) {
-                        cameraEnabled = true
-                        locationEnabled = true
-                    }
-                }
-
-                Lifecycle.Event.ON_PAUSE -> {
-                    cameraEnabled = false
-                }
-
-                else -> {}
-            }
-        }
-
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
-
     LaunchedEffect(Unit) {
         cameraEnabled = true
         locationEnabled = true
         remainingSeconds = selectedDuration * 60
         isTimerRunning = true
-    }
-
-    LaunchedEffect(isTimerRunning) {
-        if (!isTimerRunning) return@LaunchedEffect
-
-        while (remainingSeconds > 0) {
-            delay(1000)
-            remainingSeconds--
-        }
-
-        // ⛔ AUTO OFF
-        cameraEnabled = false
-        locationEnabled = false
-        isTimerRunning = false
-        isCameraReady = false
     }
 
     LaunchedEffect(locationEnabled) {
@@ -318,6 +178,7 @@ fun AdminFaceAbsensiScreen() {
                         )
                     )
 
+
                     ExposedDropdownMenu(
                         expanded = expanded,
                         onDismissRequest = { expanded = false }
@@ -334,9 +195,11 @@ fun AdminFaceAbsensiScreen() {
                     }
                 }
 
+
                 // ⏳ COUNTDOWN
                 val min = remainingSeconds / 60
                 val sec = remainingSeconds % 60
+
 
                 Text(
                     text = if (isTimerRunning)
@@ -348,15 +211,6 @@ fun AdminFaceAbsensiScreen() {
                     textAlign = TextAlign.Center
                 )
             }
-
-            Spacer(Modifier.height(2.dp))
-
-            LivenessInstructionText(
-                isSessionStarted = isSessionStarted,
-                currentStep = currentLivenessStep,
-                headUpDone = headUpDone,
-                livenessPassed = livenessPassed
-            )
 
             Spacer(Modifier.height(6.dp))
 
@@ -370,193 +224,15 @@ fun AdminFaceAbsensiScreen() {
                 if (cameraEnabled) {
                     AdminFaceAbsensiCamera(
                         onReady = { isCameraReady = true },
-                        currentStepIndex = currentLivenessIndex,
-                        onFaceFrame = { face, stepIndex ->   // 👈 INI DIA
-                            if (!isSessionStarted) return@AdminFaceAbsensiCamera
-                            if (stepIndex >= livenessSteps.size) return@AdminFaceAbsensiCamera
-                            val now = System.currentTimeMillis()
 
-                            if (stepStartTime > 0 && now - stepStartTime > STEP_TIMEOUT_MS) {
-                                Log.w(TAG_ADMIN_ABSEN, "⏱ STEP TIMEOUT!")
+                        // liveness sudah dihapus → kosong saja
+                        onFaceFrame = { _ -> },
 
-                                statusText = "Waktu habis, silakan ulangi absen"
-                                statusColor = Color.Red
-
-                                // reset session
-                                statusColor = Color.Red
-                                resetLiveness(autoRestart = true)
-                                stepStartTime = 0L
-
-                                return@AdminFaceAbsensiCamera
-                            }
-
-                            val step = livenessSteps[stepIndex]
-
-                            when (step) {
-                                LivenessStep.HEAD_NOD -> {
-                                    if (headNodDone) return@AdminFaceAbsensiCamera
-
-                                    val pitch = face.headEulerAngleX
-                                    val absPitch = kotlin.math.abs(pitch)
-
-                                    Log.d(TAG_ADMIN_ABSEN, "🎯 HEAD_NOD: pitch=${"%.1f".format(pitch)} up=$headUpDone")
-
-                                    // fase naik
-                                    if (!headUpDone) {
-                                        if (absPitch > 12f) {
-                                            headUpFrame++
-                                            if (headUpFrame >= 2) {
-                                                headUpDone = true
-                                                headUpFrame = 0
-                                                Log.d(TAG_ADMIN_ABSEN, "⬆️ HEAD UP OK")
-                                            }
-                                        } else {
-                                            headUpFrame = 0
-                                        }
-                                        return@AdminFaceAbsensiCamera
-                                    }
-
-                                    // fase balik
-                                    // fase balik (event-based, TIDAK pakai frame)
-                                    if (absPitch < 10f) {
-                                        Log.d(TAG_ADMIN_ABSEN, "⬇️ HEAD NOD COMPLETE")
-                                        headNodDone = true
-
-                                        if (!isTransitioningStep) {
-                                            isTransitioningStep = true
-                                            scope.launch {
-                                                delay(STEP_TRANSITION_DELAY_MS)
-                                                currentLivenessIndex = stepIndex + 1
-                                                isTransitioningStep = false
-                                            }
-                                        }
-
-                                        // reset state
-                                        headUpDone = false
-                                        headUpFrame = 0
-                                        headDownFrame = 0
-                                        blinkDone = false
-                                        eyesClosed = false
-                                    }
-                                }
-
-                                LivenessStep.BLINK -> {
-                                    if (blinkDone) return@AdminFaceAbsensiCamera
-
-                                    val left = face.leftEyeOpenProbability
-                                    val right = face.rightEyeOpenProbability
-
-                                    if (left == null || right == null) return@AdminFaceAbsensiCamera
-
-                                    Log.d(TAG_ADMIN_ABSEN, "👁️ BLINK: L=${"%.2f".format(left)} R=${"%.2f".format(right)} closed=$eyesClosed done=$blinkDone")
-
-                                    if (left < 0.25f && right < 0.25f) {
-                                        if (!eyesClosed) {
-                                            eyesClosed = true
-                                            Log.d(TAG_ADMIN_ABSEN, "👁️ EYES CLOSED ✅")
-                                        }
-                                        return@AdminFaceAbsensiCamera
-                                    }
-
-                                    if (eyesClosed && left > 0.6f && right > 0.6f) {
-                                        Log.d(TAG_ADMIN_ABSEN, "👁️ ✅ BLINK COMPLETE → incrementing")
-                                        blinkDone = true
-                                        eyesClosed = false
-
-                                        if (!isTransitioningStep) {
-                                            isTransitioningStep = true
-                                            scope.launch {
-                                                delay(STEP_TRANSITION_DELAY_MS)
-                                                currentLivenessIndex = stepIndex + 1
-                                                isTransitioningStep = false
-                                            }
-                                        }
-                                    }
-                                }
-
-                                LivenessStep.TURN_RIGHT -> {
-                                    if (turnRightDone) return@AdminFaceAbsensiCamera
-
-                                    val yaw = face.headEulerAngleY
-                                    Log.d(TAG_ADMIN_ABSEN, "➡️ TURN_RIGHT yaw=${"%.1f".format(yaw)}")
-
-                                    if (yaw < -20f) {
-                                        turnFrame++
-                                        if (turnFrame >= 2) {
-                                            turnRightDone = true
-                                            turnFrame = 0
-
-                                            if (!isTransitioningStep) {
-                                                isTransitioningStep = true
-                                                scope.launch {
-                                                    delay(STEP_TRANSITION_DELAY_MS)
-                                                    currentLivenessIndex = stepIndex + 1
-                                                    isTransitioningStep = false
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                LivenessStep.TURN_LEFT -> {
-                                    if (turnLeftDone) return@AdminFaceAbsensiCamera
-
-                                    val yaw = face.headEulerAngleY
-                                    Log.d(TAG_ADMIN_ABSEN, "⬅️ TURN_LEFT yaw=${"%.1f".format(yaw)}")
-
-                                    if (yaw > 20f) {
-                                        turnFrame++
-                                        if (turnFrame >= 2) {
-                                            turnLeftDone = true
-                                            turnFrame = 0
-
-                                            if (!isTransitioningStep) {
-                                                isTransitioningStep = true
-                                                scope.launch {
-                                                    delay(STEP_TRANSITION_DELAY_MS)
-                                                    currentLivenessIndex = stepIndex + 1
-                                                    isTransitioningStep = false
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                LivenessStep.SMILE -> {
-                                    if (smileDone) return@AdminFaceAbsensiCamera
-
-                                    val smileProb = face.smilingProbability
-                                    if (smileProb == null) return@AdminFaceAbsensiCamera
-
-                                    Log.d(TAG_ADMIN_ABSEN, "😄 SMILE: prob=${"%.2f".format(smileProb)}")
-
-                                    if (smileProb > 0.6f) {
-                                        smilingFrame++
-                                        if (smilingFrame >= 2) {
-                                            smileDone = true
-                                            smilingFrame = 0
-
-                                            if (!isTransitioningStep) {
-                                                isTransitioningStep = true
-                                                scope.launch {
-                                                    delay(STEP_TRANSITION_DELAY_MS)
-                                                    currentLivenessIndex = stepIndex + 1
-                                                    isTransitioningStep = false
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                else -> {}
-                            }
-                        },
                         onCaptured = { bmp ->
                             if (bmp == null) {
                                 statusText = "Wajah tidak valid"
                                 statusColor = Color.Red
                                 isCapturing = false
-                                resetLiveness(autoRestart = true)
                                 return@AdminFaceAbsensiCamera
                             }
 
@@ -576,13 +252,6 @@ fun AdminFaceAbsensiScreen() {
 
                                 if (result.success) {
                                     showSuccessDialog = true
-                                    statusText = ""
-
-                                    // 🔥 RESET LIVENESS STATE
-                                    isSessionStarted = false
-                                    livenessSteps = emptyList()
-                                    currentLivenessIndex = 0
-                                    stepStartTime = 0L
                                 } else {
                                     statusText = result.message
                                     statusColor = Color.Red
@@ -628,7 +297,7 @@ fun AdminFaceAbsensiScreen() {
             Spacer(Modifier.height(16.dp))
 
             Button(
-                enabled = isCameraReady && !isUploading && !isCapturing && !isSessionStarted,
+                enabled = isCameraReady && !isUploading && !isCapturing,
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFFB63352),
@@ -636,21 +305,14 @@ fun AdminFaceAbsensiScreen() {
                 ),
                 shape = RoundedCornerShape(5.dp),
                 onClick = {
-
-                    livenessSteps = LivenessStep.values()
-                        .toList()
-                        .shuffled()
-                        .take(2)
-                    currentLivenessIndex = 0
-                    stepStartTime = System.currentTimeMillis()
-                    isSessionStarted = true
+                    isCapturing = true
+                    AdminCameraController.capture()
                 }
             ) {
                 Text(
                     when {
                         isUploading -> "Lihat Ke Kamera"
                         isCapturing -> "Lihat Ke Kamera"
-                        isSessionStarted -> "Ikuti instruksi"
                         else -> "Ambil Foto"
                     }
                 )
@@ -850,63 +512,5 @@ fun AdminFaceAbsensiScreen() {
                 }
             }
         }
-    }
-}
-
-@OptIn(ExperimentalAnimationApi::class)
-@Composable
-fun LivenessInstructionText(
-    isSessionStarted: Boolean,
-    currentStep: LivenessStep?,
-    headUpDone: Boolean,
-    livenessPassed: Boolean
-) {
-    val instructionText = when {
-        !isSessionStarted ->
-            "Tekan tombol di bawah untuk mulai absensi"
-
-        currentStep == LivenessStep.HEAD_NOD ->
-            if (!headUpDone) "⬆️ Gerakkan kepala (atas / bawah)"
-            else "⬇️ Kembali ke posisi normal"
-
-        currentStep == LivenessStep.BLINK ->
-            "👁️ Kedipkan mata"
-
-        currentStep == LivenessStep.TURN_RIGHT ->
-            "➡️ Hadapkan wajah ke kanan"
-
-        currentStep == LivenessStep.TURN_LEFT ->
-            "⬅️ Hadapkan wajah ke kiri"
-
-        currentStep == LivenessStep.SMILE ->
-            "😄 Senyum ke kamera"
-
-        livenessPassed ->
-            "✅ Liveness selesai"
-
-        else -> ""
-    }
-
-    val instructionColor = when {
-        !isSessionStarted -> Color.Gray
-        livenessPassed -> Color(0xFF2E7D32)
-        else -> Color(0xFFFF9800)
-    }
-
-    AnimatedContent(
-        targetState = instructionText,
-        transitionSpec = {
-            (fadeIn(tween(220)) + slideInVertically { it / 4 }) with
-                    (fadeOut(tween(180)) + slideOutVertically { -it / 4 })
-        },
-        label = "LivenessInstruction"
-    ) { text ->
-        Text(
-            text = text,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = instructionColor,
-            textAlign = TextAlign.Center
-        )
     }
 }
