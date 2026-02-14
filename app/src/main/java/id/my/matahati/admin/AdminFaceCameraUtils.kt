@@ -38,7 +38,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 const val TAG_ADMIN_ABSEN = "ADMIN_FACE_ABSEN"
-private const val ADMIN_FACE_ABSEN_URL = "https://absensi.matahati.my.id/admin_face_scan_mobile.php"
+private const val ADMIN_FACE_ABSEN_URL = "https://absensi.matahati.my.id/admin_face_scan_ssid.php"
 private const val API_KEY = "MH4T4H4TI_2025_ABSENSI_APP_SECRETx9P2F7Q1L8S3Z0R6W4K2D1M9B7T5"
 private const val MSG_DEVICE_NOT_REGISTERED = "Device belum terdaftar"
 
@@ -293,19 +293,27 @@ fun resizeFaceForLogin(bitmap: Bitmap, size: Int = 320): Bitmap =
 suspend fun reverseGeocode(lat: Double, lng: Double): String =
     withContext(Dispatchers.IO) {
         try {
-            val req = Request.Builder()
+            val request = Request.Builder()
                 .url(
-                    "https://nominatim.openstreetmap.org/reverse" +
-                            "?lat=$lat&lon=$lng&format=json&addressdetails=0"
+                    "https://absensi.matahati.my.id/reverse_geocode.php" +
+                            "?lat=$lat&lon=$lng"
                 )
-                .header("User-Agent", "MatahatiAbsensiAdmin/1.0")
                 .build()
 
-            httpClient.newCall(req).execute().use {
-                val body = it.body?.string() ?: return@withContext ""
-                JSONObject(body).optString("display_name", "")
+            httpClient.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful || !body.startsWith("{")) {
+                    return@withContext "$lat,$lng"
+                }
+
+                val obj = JSONObject(body)
+                val place = obj.optString("display_name", "")
+
+                if (place.isNotBlank()) place else "$lat,$lng"
             }
-        } catch (_: Exception) {
-            ""
+
+        } catch (e: Exception) {
+            "$lat,$lng"
         }
     }
+

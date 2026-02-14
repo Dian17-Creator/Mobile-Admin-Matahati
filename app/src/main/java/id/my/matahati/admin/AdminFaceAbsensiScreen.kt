@@ -11,7 +11,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -21,7 +20,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -414,102 +414,96 @@ fun AdminFaceAbsensiScreen() {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(125.dp)
-                        .padding(horizontal = 0.dp),
+                        .height(200.dp), // sama seperti user
                     shape = RoundedCornerShape(10.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(4.dp)
                 ) {
 
-
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center // ✅ KUNCI UTAMA
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(4), // ✅ 1 BARIS = 4 MENU
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        userScrollEnabled = false // 🔥 PENTING: tidak scroll sendiri
                     ) {
-                        LazyRow(
-                            state = listState,
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            contentPadding = PaddingValues(horizontal = 5.dp)
-                        ) {
 
-                            item {
-                                ActionCard(
-                                    icon = Icons.Default.Refresh,
-                                    label = "Refresh",
-                                ) {
-                                    cameraEnabled = true
-                                    locationEnabled = true
-                                    remainingSeconds = selectedDuration * 60
-                                    isTimerRunning = true
-                                }
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.Refresh,
+                                label = "Refresh"
+                            ) {
+                                cameraEnabled = true
+                                locationEnabled = true
+                                remainingSeconds = selectedDuration * 60
+                                isTimerRunning = true
                             }
+                        }
 
-                            item {
-                                ActionCard(
-                                    icon = Icons.Default.Face,
-                                    label = "Face Register",
-                                ) {
-                                    context.launchWithSlide(RegistrasiWajahAdmin::class.java)
-                                }
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.Face,
+                                label = "Face Reg"
+                            ) {
+                                context.launchWithSlide(RegistrasiWajahAdmin::class.java)
                             }
+                        }
 
-                            item {
-                                ActionCard(
-                                    icon = Icons.Default.QrCode2,
-                                    label = "QR",
-                                ) {
-                                    context.launchWithSlide(QrPage::class.java)
-                                }
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.QrCode2,
+                                label = "QR"
+                            ) {
+                                context.launchWithSlide(QrPage::class.java)
                             }
+                        }
 
-                            item {
-                                ActionCard(
-                                    icon = Icons.Default.PhoneAndroid,
-                                    label = "ID",
-                                ) {
-                                    context.launchWithSlide(DeviceInfoAdminActivity::class.java)
-                                }
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.PhoneAndroid,
+                                label = "ID"
+                            ) {
+                                context.launchWithSlide(DeviceInfoAdminActivity::class.java)
                             }
+                        }
 
-                            item {
-                                ActionCard(
-                                    icon = Icons.Default.Edit,
-                                    label = "Manual",
-                                ) {
-                                    context.launchWithSlide(AbsenManual::class.java)
-                                }
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.Edit,
+                                label = "Manual"
+                            ) {
+                                context.launchWithSlide(AbsenManual::class.java)
                             }
+                        }
 
-                            item {
-                                ActionCard(
-                                    icon = Icons.Default.Event,
-                                    label = "Izin",
-                                ) {
-                                    context.launchWithSlide(IzinAdmin::class.java)
-                                }
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.Event,
+                                label = "Izin"
+                            ) {
+                                context.launchWithSlide(IzinAdmin::class.java)
                             }
+                        }
 
-
-
-                            item {
-                                ActionCard(
-                                    icon = Icons.Default.Logout,
-                                    label = "Logout",
-                                ) {
-                                    if (session.isRememberMe()) {
-                                        session.clearSession()
-                                    } else {
-                                        session.clearLoginButKeepTemp()
-                                    }
-                                    val intent = Intent(context, LoginPage::class.java)
-                                    context.startActivity(intent)
-                                    if (context is ComponentActivity) context.finish()
+                        item {
+                            ActionCard(
+                                icon = Icons.Default.Logout,
+                                label = "Logout"
+                            ) {
+                                if (session.isRememberMe()) {
+                                    session.clearSession()
+                                } else {
+                                    session.clearLoginButKeepTemp()
                                 }
+                                context.startActivity(Intent(context, LoginPage::class.java))
+                                if (context is ComponentActivity) context.finish()
                             }
                         }
                     }
                 }
+
             }
         }
     }

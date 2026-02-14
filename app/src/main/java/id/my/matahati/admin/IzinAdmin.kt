@@ -156,21 +156,40 @@ fun IzinAdminScreen() {
 
                     // Ubah jadi alamat readable
                     withContext(Dispatchers.IO) {
-                        val client = OkHttpClient()
-                        val url =
-                            "https://nominatim.openstreetmap.org/reverse?lat=$lat&lon=$lng&format=json&addressdetails=1"
-                        val req = Request.Builder()
-                            .url(url)
-                            .addHeader("User-Agent", "MatahatiApp/1.0")
-                            .build()
-                        val res = client.newCall(req).execute()
-                        val body = res.body?.string()
-                        if (res.isSuccessful && body != null) {
-                            val obj = JSONObject(body)
-                            val displayName = obj.optString("display_name", "$lat, $lng")
-                            withContext(Dispatchers.Main) { placeName = displayName }
-                        } else {
-                            placeName = "$lat, $lng"
+                        try {
+                            val client = OkHttpClient()
+
+                            val url =
+                                "https://absensi.matahati.my.id/reverse_geocode.php?lat=$lat&lon=$lng"
+
+                            val request = Request.Builder()
+                                .url(url)
+                                .addHeader("Accept", "application/json")
+                                .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID) // opsional tapi recommended
+                                .build()
+
+                            val response = client.newCall(request).execute()
+                            val body = response.body?.string().orEmpty()
+
+                            var resolvedPlace = ""
+
+                            if (response.isSuccessful && body.startsWith("{")) {
+                                val obj = JSONObject(body)
+                                resolvedPlace = obj.optString("display_name", "")
+                            }
+
+                            withContext(Dispatchers.Main) {
+                                placeName = if (resolvedPlace.isNotBlank()) {
+                                    resolvedPlace
+                                } else {
+                                    "$lat,$lng" // fallback aman
+                                }
+                            }
+
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                placeName = "$lat,$lng"
+                            }
                         }
                     }
                 } else placeName = "Lokasi tidak tersedia"
