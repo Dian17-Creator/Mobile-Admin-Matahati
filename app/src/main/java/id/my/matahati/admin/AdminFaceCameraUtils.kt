@@ -38,7 +38,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 const val TAG_ADMIN_ABSEN = "ADMIN_FACE_ABSEN"
-private const val ADMIN_FACE_ABSEN_URL = "https://absensi.matahati.my.id/admin_face_scan_ssid.php"
+//private const val ADMIN_FACE_ABSEN_URL = "https://absensi.matahati.my.id/admin_face_scan_ssid.php"
+private const val ADMIN_FACE_ABSEN_URL = "https://absensi.karyatra.cloud/admin_face_scan_ssid.php"
 private const val API_KEY = "MH4T4H4TI_2025_ABSENSI_APP_SECRETx9P2F7Q1L8S3Z0R6W4K2D1M9B7T5"
 private const val MSG_DEVICE_NOT_REGISTERED = "Device belum terdaftar"
 
@@ -250,7 +251,8 @@ suspend fun uploadAdminFaceLogin(
             .build()
 
         val request = Request.Builder()
-            .url("https://absensi.matahati.my.id/admin_face_scan_mobile.php")
+            // .url("https://absensi.matahati.my.id/admin_face_scan_mobile.php")
+            .url("https://absensi.karyatra.cloud/admin_face_scan_mobile.php")
             .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID)
             .post(body)
             .build()
@@ -294,8 +296,13 @@ suspend fun reverseGeocode(lat: Double, lng: Double): String =
     withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder()
+//                .url(
+//                    "https://absensi.matahati.my.id/reverse_geocode.php" +
+//                            "?lat=$lat&lon=$lng"
+//                )
+
                 .url(
-                    "https://absensi.matahati.my.id/reverse_geocode.php" +
+                    "https://absensi.karyatra.cloud/reverse_geocode.php" +
                             "?lat=$lat&lon=$lng"
                 )
                 .build()

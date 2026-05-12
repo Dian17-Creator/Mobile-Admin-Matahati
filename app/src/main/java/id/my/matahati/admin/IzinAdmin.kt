@@ -159,8 +159,8 @@ fun IzinAdminScreen() {
                         try {
                             val client = OkHttpClient()
 
-                            val url =
-                                "https://absensi.matahati.my.id/reverse_geocode.php?lat=$lat&lon=$lng"
+                            //val url = "https://absensi.matahati.my.id/reverse_geocode.php?lat=$lat&lon=$lng"
+                            val url = "https://absensi.karyatra.cloud/reverse_geocode.php?lat=$lat&lon=$lng"
 
                             val request = Request.Builder()
                                 .url(url)
@@ -208,7 +208,8 @@ fun IzinAdminScreen() {
                 val client = OkHttpClient()
 
                 val request = Request.Builder()
-                    .url("https://absensi.matahati.my.id/get_users_by_department.php?admin_id=$adminId")
+                    //.url("https://absensi.matahati.my.id/get_users_by_department.php?admin_id=$adminId")
+                    .url("https://absensi.karyatra.cloud/get_users_by_department.php?admin_id=$adminId")
                     .get()
                     .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID) // optional, aman
                     .build()
@@ -566,7 +567,8 @@ suspend fun submitIzinAdminWithPhoto(
             .toRequestBody("application/json; charset=utf-8".toMediaType())
 
         val request = Request.Builder()
-            .url("https://absensi.matahati.my.id/izin_admin.php")
+            //.url("https://absensi.matahati.my.id/izin_admin.php")
+            .url("https://absensi.karyatra.cloud/izin_admin.php")
             .post(body)
             .addHeader("Content-Type", "application/json")
             .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID) // 🔒 DEVICE GATE
@@ -617,7 +619,8 @@ class SyncIzinAdminWorker(
                 }
 
                 val request = Request.Builder()
-                    .url("https://absensi.matahati.my.id/izin_admin.php")
+                    //.url("https://absensi.matahati.my.id/izin_admin.php")
+                    .url("https://absensi.karyatra.cloud/izin_admin.php")
                     .post(json.toString().toRequestBody("application/json".toMediaType()))
                     .addHeader("Accept", "application/json")
                     .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID)

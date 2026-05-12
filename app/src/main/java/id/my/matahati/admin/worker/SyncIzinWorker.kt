@@ -46,7 +46,8 @@ class SyncIzinWorker(
                     }
 
                     val request = Request.Builder()
-                        .url("https://absensi.matahati.my.id/izin_admin.php")
+                        //.url("https://absensi.matahati.my.id/izin_admin.php")
+                        .url("https://absensi.karyatra.cloud/izin_admin.php")
                         .post(json.toString().toRequestBody("application/json".toMediaTypeOrNull()))
                         .addHeader("Accept", "application/json")
                         .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID)

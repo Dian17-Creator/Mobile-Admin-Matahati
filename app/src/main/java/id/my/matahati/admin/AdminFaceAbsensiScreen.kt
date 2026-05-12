@@ -33,8 +33,6 @@ import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.QrCode2
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -430,17 +428,17 @@ fun AdminFaceAbsensiScreen() {
                         userScrollEnabled = false // 🔥 PENTING: tidak scroll sendiri
                     ) {
 
-                        item {
-                            ActionCard(
-                                icon = Icons.Default.Refresh,
-                                label = "Refresh"
-                            ) {
-                                cameraEnabled = true
-                                locationEnabled = true
-                                remainingSeconds = selectedDuration * 60
-                                isTimerRunning = true
-                            }
-                        }
+//                        item {
+//                            ActionCard(
+//                                icon = Icons.Default.Refresh,
+//                                label = "Refresh"
+//                            ) {
+//                                cameraEnabled = true
+//                                locationEnabled = true
+//                                remainingSeconds = selectedDuration * 60
+//                                isTimerRunning = true
+//                            }
+//                        }
 
                         item {
                             ActionCard(
@@ -451,14 +449,14 @@ fun AdminFaceAbsensiScreen() {
                             }
                         }
 
-                        item {
-                            ActionCard(
-                                icon = Icons.Default.QrCode2,
-                                label = "QR"
-                            ) {
-                                context.launchWithSlide(QrPage::class.java)
-                            }
-                        }
+//                        item {
+//                            ActionCard(
+//                                icon = Icons.Default.QrCode2,
+//                                label = "QR"
+//                            ) {
+//                                context.launchWithSlide(QrPage::class.java)
+//                            }
+//                        }
 
                         item {
                             ActionCard(

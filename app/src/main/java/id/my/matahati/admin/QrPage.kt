@@ -476,7 +476,8 @@ suspend fun fetchAndGenerateQR(
         try {
             val client = OkHttpClient()
             val request = Request.Builder()
-                .url("https://absensi.matahati.my.id/qrabsen.php?action=refresh_token")
+                //.url("https://absensi.matahati.my.id/qrabsen.php?action=refresh_token")
+                .url("https://absensi.karyatra.cloud/qrabsen.php?action=refresh_token")
                 .build()
 
             val response = client.newCall(request).execute()
@@ -518,7 +519,8 @@ suspend fun fetchAndGenerateQR(
                     .build()
 
                 val updateRequest = Request.Builder()
-                    .url("https://absensi.matahati.my.id/qrabsen.php")
+                    //.url("https://absensi.matahati.my.id/qrabsen.php")
+                    .url("https://absensi.karyatra.cloud/qrabsen.php")
                     .post(formBody)
                     .build()
 
@@ -573,7 +575,9 @@ suspend fun checkTokenStatus(token: String): Boolean {
         try {
             val client = OkHttpClient()
             val request = Request.Builder()
-                .url("https://absensi.matahati.my.id/check_token_status.php?token=" +
+//                .url("https://absensi.matahati.my.id/check_token_status.php?token=" +
+//                        java.net.URLEncoder.encode(token, "UTF-8"))
+                .url("https://absensi.karyatra.cloud/check_token_status.php?token=" +
                         java.net.URLEncoder.encode(token, "UTF-8"))
                 .build()
 
