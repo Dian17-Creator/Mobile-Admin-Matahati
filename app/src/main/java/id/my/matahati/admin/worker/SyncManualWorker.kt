@@ -69,7 +69,8 @@ class SyncManualWorker(
                     }
 
                     val request = Request.Builder()
-                        .url("https://absensi.matahati.my.id/manual_checkin.php")
+                        //.url("https://absensi.matahati.my.id/manual_checkin.php")
+                        .url("https://absensi.karyatra.cloud/manual_checkin.php")
                         .post(json.toString().toRequestBody("application/json".toMediaType()))
                         .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID)
                         .build()

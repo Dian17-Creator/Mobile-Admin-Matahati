@@ -1,6 +1,7 @@
 package id.my.matahati.admin
 
 import android.Manifest
+import android.R.attr.scaleX
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -104,8 +105,11 @@ enum class AdminFaceStatus {
 
 private const val TAG_FACE = "ADMIN_FACE_REGISTER"
 private val httpClient by lazy { OkHttpClient() }
-private const val FACE_UPLOAD_URL = "https://absensi.matahati.my.id/admin_face_register.php"
-private const val FACE_CHECK_URL = "https://absensi.matahati.my.id/check_face_registered.php"
+//private const val FACE_UPLOAD_URL = "https://absensi.matahati.my.id/admin_face_register.php"
+//private const val FACE_CHECK_URL = "https://absensi.matahati.my.id/check_face_registered.php"
+
+private const val FACE_UPLOAD_URL = "https://absensi.karyatra.cloud/admin_face_register.php"
+private const val FACE_CHECK_URL = "https://absensi.karyatra.cloud/check_face_registered.php"
 
 object AdminFaceDetector {
 
@@ -630,7 +634,8 @@ suspend fun loadUsers(
         try {
             val adminId = session.getUserId()
             val req = Request.Builder()
-                .url("https://absensi.matahati.my.id/get_users_by_department.php?admin_id=$adminId")
+                //.url("https://absensi.matahati.my.id/get_users_by_department.php?admin_id=$adminId")
+                .url("https://absensi.karyatra.cloud/get_users_by_department.php?admin_id=$adminId")
                 .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID) // optional, aman
                 .build()
 

@@ -536,7 +536,8 @@ suspend fun sendManualCheckin(
     photoBase64: String?
 ): String = withContext(Dispatchers.IO) {
     try {
-        val url = "https://absensi.matahati.my.id/manual_checkin.php"
+        //val url = "https://absensi.matahati.my.id/manual_checkin.php"
+        val url = "https://absensi.karyatra.cloud/manual_checkin.php"
         val json = JSONObject().apply {
             put("admin_email", adminEmail)
             put("admin_password", adminPassword)
@@ -597,7 +598,8 @@ suspend fun ensureToken(context: Context): Boolean = withContext(Dispatchers.IO)
         }
 
         val request = Request.Builder()
-            .url("https://absensi.matahati.my.id/ensure_token.php")
+            //.url("https://absensi.matahati.my.id/ensure_token.php")
+            .url("https://absensi.karyatra.cloud/ensure_token.php")
             .post(json.toString().toRequestBody("application/json".toMediaType()))
             .addHeader("X-DEVICE-ID", MyApp.DEVICE_ID)
             .build()
